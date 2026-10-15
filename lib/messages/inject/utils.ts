@@ -357,10 +357,15 @@ export function resolveMinNudgeFloorTokens(
  * - `reasoning` (#368): a nested object that merges FIELD-WISE (model > provider
  *   > global) — blanket-applying the shallow-merged object would let an
  *   override that sets only `drop` wipe the global `threshold`.
+ * - `images` (#478): session-scoped disk side effect, intentionally excluded
+ *   from the cascade — blanket-applying it would let a misconfigured config
+ *   that places it under providers/models replace the global object with a
+ *   partial one (validation already rejects that placement as unknown).
  */
-const OVERRIDE_BLANKET_APPLY_EXCLUDE = new Set<keyof CompressModelOverrides>([
+const OVERRIDE_BLANKET_APPLY_EXCLUDE = new Set<keyof CompressModelOverrides | "images">([
     "maxContextLimit",
     "reasoning",
+    "images",
 ])
 
 /**
