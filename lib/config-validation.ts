@@ -56,6 +56,10 @@ export const VALID_CONFIG_KEYS = new Set([
     "compress.reasoning",
     "compress.reasoning.drop",
     "compress.reasoning.threshold",
+    "compress.images",
+    "compress.images.enabled",
+    "compress.images.minBytes",
+    "compress.images.ttlDays",
     "compress.completionReserveTokens",
     "gc",
     "gc.algorithm",
@@ -603,6 +607,58 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                             key: "compress.reasoning.threshold",
                             expected: "integer (>= 0)",
                             actual: JSON.stringify(compress.reasoning.threshold),
+                        })
+                    }
+                }
+            }
+
+            // [#478] Nested compress.images object — session-scoped image
+            // archiving settings (not part of the provider/model cascade).
+            if (compress.images !== undefined) {
+                if (
+                    typeof compress.images !== "object" ||
+                    compress.images === null ||
+                    Array.isArray(compress.images)
+                ) {
+                    errors.push({
+                        key: "compress.images",
+                        expected:
+                            "object { enabled?: boolean; minBytes?: integer (>= 0); ttlDays?: number (> 0) }",
+                        actual: JSON.stringify(compress.images),
+                    })
+                } else {
+                    if (
+                        compress.images.enabled !== undefined &&
+                        typeof compress.images.enabled !== "boolean"
+                    ) {
+                        errors.push({
+                            key: "compress.images.enabled",
+                            expected: "boolean",
+                            actual: typeof compress.images.enabled,
+                        })
+                    }
+                    if (
+                        compress.images.minBytes !== undefined &&
+                        (typeof compress.images.minBytes !== "number" ||
+                            !Number.isInteger(compress.images.minBytes) ||
+                            compress.images.minBytes < 0)
+                    ) {
+                        errors.push({
+                            key: "compress.images.minBytes",
+                            expected: "integer (>= 0)",
+                            actual: JSON.stringify(compress.images.minBytes),
+                        })
+                    }
+                    if (
+                        compress.images.ttlDays !== undefined &&
+                        (typeof compress.images.ttlDays !== "number" ||
+                            !Number.isFinite(compress.images.ttlDays) ||
+                            compress.images.ttlDays <= 0)
+                    ) {
+                        errors.push({
+                            key: "compress.images.ttlDays",
+                            expected: "number (> 0)",
+                            actual: JSON.stringify(compress.images.ttlDays),
                         })
                     }
                 }

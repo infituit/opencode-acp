@@ -323,6 +323,17 @@ In this example, for `anthropic/claude-sonnet-4-6`: the floor is 30%, the over-m
 - **Status:** ACTIVE
 - **Description:** When `true`, all user messages are protected from compression (not just the last one).
 
+#### `compress.images`
+
+- **Type:** object (nested, field-wise defaults)
+- **Default:** `{ "enabled": true, "minBytes": 16384, "ttlDays": 7 }`
+- **Status:** ACTIVE
+- **Description:** Image archive (#478). Images attached to messages arrive as data-URL file parts; when a range containing them is folded, ACP would otherwise drop the pixels with no recovery path. With archiving enabled, qualifying images are spilled to disk as soon as they enter the session (`<storageDir>/images/<dirName(sessionId)>/`, files mode `0600`) and any block summary covering them gains a pointer appendix listing absolute paths — the model re-reads archived images with its own file tools. Summary text itself never contains image bytes. Not part of the per-model override cascade (archive location is session-scoped).
+    - `enabled` (`boolean`, default `true`) — master switch. `false` restores pre-archive behavior exactly (no disk writes, no summary appendix).
+    - `minBytes` (`number`, bytes, default `16384`) — only images at least this large are archived. Tiny inline icons are left to normal folding.
+    - `ttlDays` (`number`, days, default `7`) — archived files older than this are deleted by a best-effort sweep that runs once per process per session.
+    - Only `data:` URL images of binary types (png/jpeg/gif/webp/avif/bmp) qualify; SVG is excluded (scriptable text format) and remote/file URLs are out of scope for v1. Archive failures are logged and never interrupt a request.
+
 #### `compress.maxSummaryLengthHard`
 
 - **Type:** `number`

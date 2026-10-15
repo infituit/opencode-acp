@@ -1,7 +1,7 @@
 import { existsSync } from "fs"
 import { join } from "path"
 import { cwd } from "process"
-import type { SessionState, ToolParameterEntry, WithParts } from "./types"
+import type { ArchivedImageEntry, SessionState, ToolParameterEntry, WithParts } from "./types"
 import type { PluginConfig } from "../config"
 import type { Logger } from "../logger"
 import {
@@ -245,6 +245,8 @@ export function createSessionState(): SessionState {
         storageDir: undefined,
         qualityGateRetryPending: false,
         noContextLimitWarned: false,
+        imageArchive: {},
+        imagePruneDone: false,
     }
 }
 
@@ -289,6 +291,8 @@ export function resetSessionState(state: SessionState): void {
     state.storageDir = undefined
     state.qualityGateRetryPending = false
     state.noContextLimitWarned = false
+    state.imageArchive = {}
+    state.imagePruneDone = false
 }
 
 export async function ensureSessionInitialized(
@@ -410,6 +414,25 @@ export async function ensureSessionInitialized(
     state.stats = {
         pruneTokenCounter: persisted.stats?.pruneTokenCounter || 0,
         totalPruneTokens: persisted.stats?.totalPruneTokens || 0,
+        imagesArchived: persisted.stats?.imagesArchived,
+        imageBytesArchived: persisted.stats?.imageBytesArchived,
+    }
+    // [Issue #478] Restore the archived-image metadata index from persisted
+    // state, dropping malformed entries (defensive: state files are user-visible).
+    if (persisted.imageArchive && typeof persisted.imageArchive === "object") {
+        for (const [rawId, entries] of Object.entries(persisted.imageArchive)) {
+            if (!Array.isArray(entries)) continue
+            const valid = entries.filter(
+                (e): e is ArchivedImageEntry =>
+                    !!e &&
+                    typeof e.path === "string" &&
+                    typeof e.mediaType === "string" &&
+                    typeof e.bytes === "number",
+            )
+            if (valid.length > 0) {
+                state.imageArchive[rawId] = valid
+            }
+        }
     }
 
     const persistedAny = persisted as any

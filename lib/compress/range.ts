@@ -33,6 +33,7 @@ import {
     wrapCompressedSummary,
 } from "./state"
 import type { CompressRangeToolArgs } from "./types"
+import { appendArchivedImagePointers } from "./image-archive"
 import { resolveKeepMarkers } from "./keep-markers"
 import { getModelInfo, applyCompressOverrides } from "../messages/inject/utils"
 import { buildQualityRejectionError, evaluatePreCommitQuality } from "./quality-gate"
@@ -250,11 +251,19 @@ export function createCompressRangeTool(factoryCtx: ToolFactoryContext): ReturnT
                     return true
                 })
 
+                // [#478] A folded range must not silently lose image pixels:
+                // append a disk pointer for every archived image in the range so
+                // the model can re-read them after folding.
                 preparedPlans.push({
                     entry: plan.entry,
                     selection: plan.selection,
                     anchorMessageId: plan.anchorMessageId,
-                    finalSummary: completedSummary.expandedSummary,
+                    finalSummary: appendArchivedImagePointers(
+                        completedSummary.expandedSummary,
+                        plan.selection,
+                        ctx.state,
+                        ctx.config.compress.images?.enabled !== false,
+                    ),
                     consumedBlockIds: mergeConsumedBlockIds,
                 })
             }
