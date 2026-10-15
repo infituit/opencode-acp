@@ -20,7 +20,8 @@ import {
 import { applyCompressOverrides } from "./messages/inject/utils"
 import { renderSystemPrompt, type PromptStore } from "./prompts"
 import { buildProtectedToolsExtension } from "./prompts/extensions/system"
-import { DEFAULT_COMPRESS_REASONING } from "./config"
+import { DEFAULT_COMPRESS_IMAGES, DEFAULT_COMPRESS_REASONING } from "./config"
+import { archiveSessionImages, pruneImageArchive } from "./compress/image-archive"
 import {
     applyPendingCompressionDurations,
     buildCompressionTimingKey,
@@ -343,6 +344,22 @@ export function createChatMessageTransformHandler(
         })
         cacheSystemPromptTokens(state, output.messages)
         assignMessageRefs(state, output.messages)
+        // [#478] Spill inline image attachments to disk so later folds keep a
+        // re-readable file pointer instead of silently losing pixels. Never
+        // throws; persists the metadata index only when something new landed.
+        const imagesConfig = config.compress.images ?? DEFAULT_COMPRESS_IMAGES
+        if (imagesConfig.enabled) {
+            const archivedImages = archiveSessionImages(
+                state,
+                output.messages,
+                imagesConfig,
+                logger,
+            )
+            if (archivedImages > 0) {
+                saveSessionState(state, logger).catch(() => {})
+            }
+            pruneImageArchive(state, imagesConfig, logger)
+        }
         const activeBlockCountBefore = state.prune.messages.activeBlockIds.size // [FIX Bug 4]
         const compressionStateChanged = syncCompressionBlocks(state, logger, output.messages)
         if (

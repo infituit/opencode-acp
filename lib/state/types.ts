@@ -20,6 +20,20 @@ export interface ToolParameterEntry {
 export interface SessionStats {
     pruneTokenCounter: number
     totalPruneTokens: number
+    /** [Issue #478] Count of image files written to the session archive (cumulative). */
+    imagesArchived?: number
+    /** [Issue #478] Total bytes of archived images (cumulative). */
+    imageBytesArchived?: number
+}
+
+/**
+ * [Issue #478] Metadata for one archived session image. Pixels live on disk;
+ * only this record persists in state (no base64 in memory or on disk state).
+ */
+export interface ArchivedImageEntry {
+    path: string
+    mediaType: string
+    bytes: number
 }
 
 export interface PrunedMessageEntry {
@@ -198,4 +212,15 @@ export interface SessionState {
      * warning fires at most once per session per process.
      */
     noContextLimitWarned: boolean
+    /**
+     * [Issue #478] Metadata index of archived session images, keyed by RAW
+     * message ID. Raw IDs are stable across compaction ref re-issues, so the
+     * archived paths stay valid even when mNNNNN refs restart. Persisted.
+     */
+    imageArchive: Record<string, ArchivedImageEntry[]>
+    /**
+     * [Issue #478] Transient flag (NOT persisted): TTL housekeeping of the
+     * image archive directory has run for this session in this process.
+     */
+    imagePruneDone: boolean
 }
