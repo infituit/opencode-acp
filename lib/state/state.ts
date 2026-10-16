@@ -247,6 +247,7 @@ export function createSessionState(): SessionState {
         noContextLimitWarned: false,
         imageArchive: {},
         imagePruneDone: false,
+        stickyTruncations: {},
     }
 }
 
@@ -293,6 +294,7 @@ export function resetSessionState(state: SessionState): void {
     state.noContextLimitWarned = false
     state.imageArchive = {}
     state.imagePruneDone = false
+    state.stickyTruncations = {}
 }
 
 export async function ensureSessionInitialized(
@@ -431,6 +433,16 @@ export async function ensureSessionInitialized(
             )
             if (valid.length > 0) {
                 state.imageArchive[rawId] = valid
+            }
+        }
+    }
+    // [Issue #485] Restore sticky emergency truncations (callID → frozen
+    // truncated output). Defensive: drop non-string entries.
+    const persistedSticky = (persisted as { stickyTruncations?: unknown }).stickyTruncations
+    if (persistedSticky && typeof persistedSticky === "object") {
+        for (const [callID, output] of Object.entries(persistedSticky as Record<string, unknown>)) {
+            if (typeof output === "string") {
+                state.stickyTruncations[callID] = output
             }
         }
     }

@@ -23,9 +23,14 @@ Add a config switch `compress.emergencyTruncation` (boolean, **default
 `false`**) that gates BOTH emergency-truncation guards in the
 message-transform pipeline:
 
-- `true` — current behavior: oversized old tool outputs are truncated
-  head+tail near the context wall to keep the request within the model
-  window.
+- `true` — guards run: oversized old tool outputs are truncated head+tail
+  near the context wall to keep the request within the model's window.
+  Truncation is **sticky** (#485 follow-up, user request m00196): once a
+  tool output is truncated, the result is frozen in SessionState keyed by
+  tool call ID and replayed verbatim on every later request (and across
+  restarts via state persistence). The wire view never oscillates
+  (A→B→B→B); the full content stays in the session store / on disk, so
+  nothing is lost.
 - `false` (default) — guards are skipped entirely; a session that outgrows
   the window fails loudly at the provider (HTTP 400) instead of being
   silently mutated per-request. Compression nudges remain the primary
@@ -40,10 +45,9 @@ The switch must be:
 
 ## Non-goals
 
-- No sticky/deterministic truncation persistence (considered, deferred —
-  the user chose a kill switch because a cluster-wide retry-storm outage is
-  worse than a single session failing loudly).
 - No version bump / CHANGELOG on this feature branch.
+- Sticky map is per-session and pruned when calls vanish; no cross-session
+  sharing.
 
 ## Acceptance
 

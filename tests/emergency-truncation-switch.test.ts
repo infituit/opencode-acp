@@ -31,6 +31,11 @@ import { Logger } from "../lib/logger"
 import { createSessionState, type SessionState, type WithParts } from "../lib/state"
 import { getInvalidConfigKeys, validateConfigTypes } from "../lib/config-validation"
 import { createTestRegistry } from "./registry-stub"
+import {
+    applyStickyTruncations,
+    recordStickyTruncations,
+    snapshotToolOutputs,
+} from "../lib/messages/sticky-truncation"
 
 const SID = "session-trunc-switch"
 const TRUNCATION_MARKER = "[truncated for context space"
@@ -259,4 +264,136 @@ test("opt-in on: the same scenario truncates the oversized tool output", async (
     } finally {
         rmSync(tempDir, { recursive: true, force: true })
     }
+})
+
+// ─── Sticky truncation (#485): no oscillation across requests ─────────
+
+test("sticky: truncation is frozen and replayed byte-identically on later requests", async () => {
+    const config = buildConfig()
+    config.compress.emergencyTruncation = true
+    const { state, handler, tempDir } = setupPipeline(config)
+    try {
+        // ── Turn 1: over budget → guards truncate A→B, freeze B in state.
+        const turn1 = { messages: buildScenarioMessages() }
+        await handler({}, turn1)
+        const turn1Output = (
+            (turn1.messages[1] as WithParts).parts.find((p: any) => p.type === "tool") as any
+        ).state.output as string
+        assert.ok(turn1Output.includes(TRUNCATION_MARKER), "turn 1 must truncate")
+        const frozen = state.stickyTruncations["call-big-read"]
+        assert.ok(typeof frozen === "string", "truncation must be frozen in state.stickyTruncations")
+        assert.ok(
+            !frozen.includes("dcp-message-id"),
+            "frozen value must be tag-free (recorded before injectMessageIds)",
+        )
+
+        // ── Turn 2: usage now reflects the TRUNCATED request (smaller), so the
+        // guards alone would NOT truncate — the pristine A from the session
+        // store would be restored (the #485 oscillation). Stickiness must
+        // replay B byte-identically instead.
+        const turn2 = {
+            messages: [
+                makeUserMessage("u1", "Hello"),
+                makeAssistantMessage("a1", "Reading files", [
+                    makeToolPart("call-big-read", "read", BIG_TOOL_OUTPUT),
+                ]),
+                makeAssistantMessage("a2", "Done reading"),
+                makeAssistantMessage("a3", "Summary so far", [], { input: 3_000, output: 50 }),
+                makeUserMessage("u2", "Continue the analysis"),
+            ],
+        }
+        await handler({}, turn2)
+        const turn2Output = (
+            (turn2.messages[1] as WithParts).parts.find((p: any) => p.type === "tool") as any
+        ).state.output as string
+        assert.ok(
+            turn2Output.includes(TRUNCATION_MARKER),
+            "turn 2 must stay truncated (sticky replay), not restore the full output",
+        )
+        // Byte-identical wire view across consecutive requests → prefix cache
+        // stays valid from this message onward.
+        assert.equal(turn2Output, turn1Output)
+        assert.equal(state.stickyTruncations["call-big-read"], frozen)
+    } finally {
+        rmSync(tempDir, { recursive: true, force: true })
+    }
+})
+
+test("sticky: frozen map stays empty when the switch is off", async () => {
+    const { state, handler, tempDir } = setupPipeline(buildConfig())
+    try {
+        const output = { messages: buildScenarioMessages() }
+        await handler({}, output)
+        assert.equal(Object.keys(state.stickyTruncations).length, 0)
+    } finally {
+        rmSync(tempDir, { recursive: true, force: true })
+    }
+})
+
+test("sticky: unit — replay skips non-string outputs, prunes vanished calls", () => {
+    const state = createSessionState()
+    state.stickyTruncations = {
+        "call-keep": "frozen output",
+        "call-vanished": "gone",
+    }
+    const messages = [
+        {
+            info: { id: "m1", role: "user" },
+            parts: [
+                {
+                    type: "tool",
+                    callID: "call-keep",
+                    state: { output: "full pristine output" },
+                },
+                { type: "tool", callID: "call-bad", state: { output: 12345 } },
+            ],
+        },
+    ] as unknown as WithParts[]
+
+    applyStickyTruncations(state, messages, new Logger(false))
+
+    const toolParts = (messages[0] as { parts: any[] }).parts
+    assert.equal(toolParts[0].state.output, "frozen output")
+    assert.equal(toolParts[1].state.output, 12345, "non-string outputs are left alone")
+    assert.equal(state.stickyTruncations["call-vanished"], undefined, "vanished call pruned")
+    assert.ok("call-keep" in state.stickyTruncations)
+})
+
+test("sticky: unit — record freezes only outputs the guards changed", () => {
+    const state = createSessionState()
+    const before = new Map([
+        ["call-a", "original a"],
+        ["call-b", "original b"],
+    ])
+    const messages = [
+        {
+            info: { id: "m1", role: "user" },
+            parts: [
+                { type: "tool", callID: "call-a", state: { output: "truncated a" } },
+                { type: "tool", callID: "call-b", state: { output: "original b" } },
+                { type: "tool", callID: "call-new", state: { output: "new output" } },
+            ],
+        },
+    ] as unknown as WithParts[]
+
+    recordStickyTruncations(state, messages, before, new Logger(false))
+
+    assert.equal(state.stickyTruncations["call-a"], "truncated a")
+    assert.equal(state.stickyTruncations["call-b"], undefined, "unchanged output is not frozen")
+    assert.equal(
+        state.stickyTruncations["call-new"],
+        undefined,
+        "outputs absent from the snapshot (guards cannot have touched them) are not frozen",
+    )
+
+    // snapshotToolOutputs covers exactly the snapshot-eligible parts
+    const snapshot = snapshotToolOutputs(messages)
+    assert.deepEqual(
+        [...snapshot.entries()],
+        [
+            ["call-a", "truncated a"],
+            ["call-b", "original b"],
+            ["call-new", "new output"],
+        ],
+    )
 })

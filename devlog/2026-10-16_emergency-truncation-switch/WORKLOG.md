@@ -69,6 +69,46 @@
   ≈7,980 > budget → phase-1 truncation only (final ≈6,520, phase 2 skipped);
   GC threshold min(100%×40k, 40k−16,384)=23,616 stays idle.
 
+## Sticky truncation (follow-up, same PR)
+
+8. **lib/messages/sticky-truncation.ts** (NEW)
+   - `applyStickyTruncations(state, messages, logger)` — replay frozen
+     outputs onto the pristine request copy; prune entries whose callID no
+     longer appears (message deleted externally).
+   - `snapshotToolOutputs(messages)` / `recordStickyTruncations(state,
+     messages, before, logger)` — diff-before/after capture: anything the
+     guards changed (phase-1 truncation OR phase-2 clear-to-placeholder) is
+     frozen. No marker string-matching, no guard signature changes.
+   - Walks mirror the guards' part shape (`type === "tool"`, string
+     `state.output`, `callID` key). LESSON: wrote `output !== "string"`
+     (value compare) instead of `typeof` — caught and fixed before running.
+
+9. **lib/hooks.ts** — gate now runs `applyStickyTruncations` → snapshot →
+   `truncateLargeToolOutputs` → `enforceContextBudget` →
+   `recordStickyTruncations`. Replay sits AFTER injectCompressNudges on
+   purpose: candidate planning must keep seeing pre-truncation content so
+   the compress executor's parity check against fresh history matches.
+   Sticky values are recorded BEFORE injectMessageIds, so the frozen string
+   is tag-free and the appended `<dcp-message-id>` tag is re-derived each
+   request (stable because replay is byte-identical).
+
+10. **lib/state/types.ts / state.ts / persistence.ts** —
+    `SessionState.stickyTruncations: Record<string, string>`; init/reset in
+    `createSessionState`/`resetSessionState`; persisted in
+    `PersistedSessionState` + save; defensive restore (string values only)
+    in `ensureSessionInitialized`'s persisted branch, next to imageArchive.
+
+11. **tests/emergency-truncation-switch.test.ts** — 4 new tests (9 total):
+    - Multi-turn e2e stability (§5.7-style: same state across 2 handler
+      invocations): turn 1 over-budget truncates + freezes; turn 2 with
+      small usage (simulating reported usage of the truncated request)
+      replays the SAME bytes — asserts turn2Output === turn1Output and
+      state.stickyTruncations stability. Verified to FAIL with the replay
+      call disabled (§5.7.3 discipline), PASS restored.
+    - Switch off → frozen map stays empty.
+    - Unit: replay skips non-string outputs + prunes vanished calls.
+    - Unit: record freezes only changed outputs; snapshot coverage.
+
 ## Verification
 
 - `npm run typecheck` ✅
