@@ -30,6 +30,11 @@ import {
 import { filterMessages, filterMessagesInPlace } from "./messages/shape"
 import { getLastUserMessage, isSyntheticMessage } from "./messages/query"
 import { OUTPUT_RESERVE_TOKENS, truncateLargeToolOutputs } from "./messages/truncate-tools"
+import {
+    applyStickyTruncations,
+    recordStickyTruncations,
+    snapshotToolOutputs,
+} from "./messages/sticky-truncation"
 import { resolveEffectiveContextLimit } from "./state/utils"
 import { enforceContextBudget } from "./messages/enforce-budget"
 import { handleContextCommand, handleStatsCommand } from "./commands"
@@ -416,18 +421,37 @@ export function createChatMessageTransformHandler(
             prePruneTokens,
             candidateMessages,
         )
-        // Candidate planning consumes the pre-truncation snapshot so its
-        // executor-parity check matches the fresh messages fetched by compress.
-        truncateLargeToolOutputs(
-            state,
-            config,
-            logger,
-            output.messages.filter((message) => !isSyntheticMessage(message)),
-        )
-        // Keep candidate planning independent from the final budget guard:
-        // candidates are computed from the pre-truncation snapshot so their
-        // ranges remain valid when the compress executor fetches fresh history.
-        enforceContextBudget(state, config, logger, output.messages)
+        // [Issue #485] Emergency truncation is opt-in. The guards are
+        // view-only (truncation never persists to the session store), so a
+        // session hovering at the guard threshold oscillates between
+        // truncated and pristine tool outputs — every flip invalidates the
+        // provider prefix cache from that message onward, and with opencode
+        // retrying on a busy backend the churn can take down the serving
+        // cluster. Default: off. When on, truncations are STICKY: replayed
+        // verbatim from state on every later request (A→B→B→B), so the wire
+        // view never flip-flops.
+        if (config.compress?.emergencyTruncation === true) {
+            // Replay frozen truncations first, so the guards see the
+            // already-truncated form and never restore the pristine output
+            // (which is what caused the #485 cache thrash).
+            applyStickyTruncations(state, output.messages, logger)
+            const toolOutputsBefore = snapshotToolOutputs(output.messages)
+            // Candidate planning consumes the pre-truncation snapshot so its
+            // executor-parity check matches the fresh messages fetched by compress.
+            truncateLargeToolOutputs(
+                state,
+                config,
+                logger,
+                output.messages.filter((message) => !isSyntheticMessage(message)),
+            )
+            // Keep candidate planning independent from the final budget guard:
+            // candidates are computed from the pre-truncation snapshot so their
+            // ranges remain valid when the compress executor fetches fresh history.
+            enforceContextBudget(state, config, logger, output.messages)
+            // Freeze whatever the guards truncated/cleared this request so it
+            // survives into the next one (and across restarts, via persistence).
+            recordStickyTruncations(state, output.messages, toolOutputsBefore, logger)
+        }
         injectMessageIds(state, config, output.messages, compressionPriorities)
         hideFailedCompressCalls(output.messages)
         stripStaleMetadata(output.messages)
