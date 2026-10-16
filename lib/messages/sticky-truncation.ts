@@ -19,6 +19,7 @@
  * disk), so nothing is lost; the wire view is simply stable.
  */
 
+import { extractCompletedToolOutput } from "../token-utils"
 import type { Logger } from "../logger"
 import type { SessionState, WithParts } from "../state"
 
@@ -45,7 +46,19 @@ function collectToolParts(messages: WithParts[]): ToolPartLike[] {
 
 /**
  * Replay frozen truncations onto the request copy, and prune entries whose
- * call no longer exists in the session (message deleted externally).
+ * call no longer exists in the projected view.
+ *
+ * [#485 review] Prune-on-vanish is intentionally coarse: a call absent from
+ * ONE request's projected view (content-based filter, mid-abort partial
+ * fetch) is treated like a deleted call and unfrozen. That is self-healing —
+ * if the call reappears pristine and a guard truncates it again, the new
+ * form is re-frozen — at the cost of a single pristine flip in that rare
+ * window.
+ *
+ * [#485 review] Replayed values are wire-only. If a provider legitimately
+ * reuses a callID for genuinely new output (not observed), the replay would
+ * mask the new content on the wire until the entry is pruned; the session
+ * store always keeps the authoritative full output.
  */
 export function applyStickyTruncations(
     state: SessionState,
@@ -63,7 +76,12 @@ export function applyStickyTruncations(
         seen.add(callID)
         const recorded = frozen[callID]
         if (recorded === undefined) continue
-        if (typeof part.state?.output !== "string" || part.state.output === recorded) continue
+        if (!part.state) continue // stateless part — cannot be a guard candidate
+        // [#485 review] Overwrite non-string outputs too: the guards
+        // stringify before truncating, so the frozen form is a string while
+        // the pristine per-request copy is whatever the store holds. Skipping
+        // non-strings would let the exact A→B→A flip survive for that shape.
+        if (part.state.output === recorded) continue
         part.state.output = recorded
         replayed++
     }
@@ -80,28 +98,37 @@ export function applyStickyTruncations(
     }
 }
 
-/** Snapshot callID → output for every tool part with a string output. */
+/**
+ * Snapshot callID → output for every completed tool part. Non-string
+ * outputs are stringified via `extractCompletedToolOutput` — the same
+ * normalization the guards use before truncating — so a guard turning an
+ * object output into a truncated string is detected as a change and frozen.
+ */
 export function snapshotToolOutputs(messages: WithParts[]): Map<string, string> {
     const snapshot = new Map<string, string>()
     for (const part of collectToolParts(messages)) {
         const callID = typeof part.callID === "string" ? part.callID : undefined
         if (!callID) continue
-        if (typeof part.state?.output !== "string") continue
-        snapshot.set(callID, part.state.output)
+        const content = extractCompletedToolOutput(part)
+        if (content === undefined) continue
+        snapshot.set(callID, content)
     }
     return snapshot
 }
 
 /**
  * Freeze any output the guards changed since `before`: a changed output is
- * either a fresh truncation or a phase-2 clear — both must stick.
+ * either a fresh truncation or a phase-2 clear — both must stick. Returns
+ * the number of entries frozen so the caller can persist immediately
+ * (every other save trigger in the transform hook fires EARLIER, so a quiet
+ * session would otherwise reach disk only via an unrelated later save).
  */
 export function recordStickyTruncations(
     state: SessionState,
     messages: WithParts[],
     before: Map<string, string>,
     logger: Logger,
-): void {
+): number {
     let recorded = 0
     for (const part of collectToolParts(messages)) {
         const callID = typeof part.callID === "string" ? part.callID : undefined
@@ -116,4 +143,5 @@ export function recordStickyTruncations(
     if (recorded > 0) {
         logger.info("Sticky truncation: froze truncated tool outputs", { recorded })
     }
+    return recorded
 }
