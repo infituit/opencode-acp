@@ -352,6 +352,17 @@ export async function ensureSessionInitialized(
             if (parentSessionId) {
                 try {
                     const parent = await loadSessionState(parentSessionId, logger)
+                    // [#485 review] Forks/subagents inherit the parent's frozen
+                    // truncations so the wire view stays stable across the fork
+                    // point (this branch returns before the regular sticky
+                    // restore below, which only runs for persisted sessions).
+                    if (parent?.stickyTruncations) {
+                        for (const [callID, output] of Object.entries(parent.stickyTruncations)) {
+                            if (typeof output === "string") {
+                                state.stickyTruncations[callID] = output
+                            }
+                        }
+                    }
                     const response = parent
                         ? await client.session.messages({ path: { id: parentSessionId } })
                         : undefined
@@ -438,7 +449,7 @@ export async function ensureSessionInitialized(
     }
     // [Issue #485] Restore sticky emergency truncations (callID → frozen
     // truncated output). Defensive: drop non-string entries.
-    const persistedSticky = (persisted as { stickyTruncations?: unknown }).stickyTruncations
+    const persistedSticky = persisted.stickyTruncations
     if (persistedSticky && typeof persistedSticky === "object") {
         for (const [callID, output] of Object.entries(persistedSticky as Record<string, unknown>)) {
             if (typeof output === "string") {
