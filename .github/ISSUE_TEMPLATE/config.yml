@@ -1,1 +1,8 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
+contact_links:
+    - name: 项目文档 / Documentation
+      url: https://github.com/infituit/opencode-acp/blob/master/README.zh-CN.md
+      about: 查阅 ACP 项目文档 / Read the ACP documentation
+    - name: English Documentation
+      url: https://github.com/infituit/opencode-acp/blob/master/README.md
+      about: Read the ACP documentation in English
