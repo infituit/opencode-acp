@@ -1,38 +1,79 @@
-name: Feature Request
-description: Suggest a new feature or improvement for DCP.
-title: "[Feature]: "
+name: 功能请求 / Feature Request
+description: 提出 ACP 新功能或改进建议 / Suggest an ACP feature or enhancement
+title: "[FEATURE]: "
 labels: ["enhancement"]
 body:
+    - type: markdown
+      attributes:
+          value: |
+              感谢你提出功能建议！提交前请先搜索现有 issues，避免重复。
+              Thanks for suggesting a feature! Please search existing issues before submitting to avoid duplicates.
+
+              已有明确需求和期望效果时使用此模板；尚需讨论方向或方案时请选择「建议与讨论」。
+              Use this form for a defined need and desired outcome; choose Discussion & Proposal for ideas that need discussion first.
+
+    - type: checkboxes
+      id: checklist
+      attributes:
+          label: 提交前检查 / Pre-submission Checklist
+          options:
+              - label: 我已搜索现有 issues，此功能尚未被提出 / I have searched existing issues and this feature has not been requested
+                required: true
+              - label: 我已阅读 [文档 / Documentation](https://github.com/infituit/opencode-acp/blob/master/README.zh-CN.md)（[English](https://github.com/infituit/opencode-acp/blob/master/README.md)）
+                required: true
+
     - type: textarea
       id: problem
       attributes:
-          label: Problem
-          description: What problem does this feature solve? What's the motivation?
-          placeholder: "I'm always frustrated when..."
+          label: 问题描述 / Problem Statement
+          description: 当前问题或限制是什么？为什么需要此功能？/ What problem or limitation motivates this request?
+          placeholder: 当 [...] 时我总是很困扰 / I'm always frustrated when [...]
       validations:
           required: true
 
     - type: textarea
       id: solution
       attributes:
-          label: Proposed Solution
-          description: Describe the solution you'd like.
-          placeholder: Describe your ideal solution...
+          label: 期望方案 / Proposed Solution
+          description: 描述你希望实现的效果 / Describe the outcome you'd like
+          placeholder: 清晰简洁地描述期望行为... / Describe the desired behavior clearly...
       validations:
           required: true
 
     - type: textarea
       id: alternatives
       attributes:
-          label: Alternatives Considered
-          description: Any alternative solutions or features you've considered?
+          label: 备选方案 / Alternatives Considered
+          description: 描述你考虑过的现有配置、工作方式或替代方案 / Describe existing settings, workflows, or alternatives you've considered
+
+    - type: dropdown
+      id: category
+      attributes:
+          label: 功能分类 / Feature Category
+          description: 该功能属于哪个方向？/ What area does this feature relate to?
+          options:
+              - 压缩与恢复 / Compression & Decompression
+              - 上下文提醒与 Token 统计 / Context Nudges & Token Accounting
+              - 消息保护与过滤 / Message Protection & Filtering
+              - 状态持久化与会话恢复 / State Persistence & Session Recovery
+              - 垃圾回收 / Garbage Collection
+              - 配置与权限 / Configuration & Permissions
+              - 安装与更新 / Installation & Updates
+              - 命令与通知 / Commands & Notifications
+              - 文档 / Documentation
+              - 其他或不确定 / Other or Unsure
       validations:
-          required: false
+          required: true
+
+    - type: textarea
+      id: use_case
+      attributes:
+          label: 使用场景 / Use Case
+          description: 此功能会如何被使用？请提供具体场景 / How would this feature be used? Provide a concrete scenario
+          placeholder: 例如：在长时间运行的会话中，需要... / e.g. In a long-running session, I need...
 
     - type: textarea
       id: additional
       attributes:
-          label: Additional Context
-          description: Any other context, examples, or references.
-      validations:
-          required: false
+          label: 附加信息 / Additional Context
+          description: 补充其他上下文、参考资料或截图 / Add any other context, references, or screenshots
