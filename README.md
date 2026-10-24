@@ -297,7 +297,7 @@ ACP uses its own config file, searched in order:
 
 Each level overrides the previous, so project settings take priority over global. Restart OpenCode after making config changes.
 
-> **📖 Full parameter reference:** See [CONFIGURATION.md](./CONFIGURATION.md) for a complete reference of every configurable parameter with type, default value, and description.
+> **📖 Full parameter reference:** The configuration reference is being rewritten. The JSON schema is available in [`dcp.schema.json`](./dcp.schema.json).
 
 > [!IMPORTANT]
 > **Disable OpenCode's built-in auto-compaction.** ACP handles context management itself — OpenCode's compaction conflicts with ACP and can cause issues (re-expanded messages, lost compression state). Add to your `opencode.json`:
@@ -485,7 +485,7 @@ Each level overrides the previous, so project settings take priority over global
     // (e.g. oh-my-opencode system reminders) from visible context before
     // ACP processes them. Filtered content is never counted toward context
     // usage. Five built-in OMO filters are on by default (v1.14.8+);
-    // per-filter reference and examples: CONFIGURATION.md → messageFilters
+    // See dcp.schema.json for the complete messageFilters schema.
     "messageFilters": {
         "enabled": true,
         "filters": {
@@ -526,7 +526,7 @@ Resolution is **per field**: model > provider > global. Unknown provider/model I
 
 Not overridable here: `permission`, the deprecated `minContextLimit` / `modelMinLimits` family, and the flat `modelMaxLimits` / `modelMinLimits` maps themselves. Note: `modelMaxLimits` is **not** deprecated — it stays fully supported; a nested `maxContextLimit` simply outranks it.
 
-See the [`compress.providers`](./CONFIGURATION.md#compressproviders) reference in CONFIGURATION.md for the full 23-field list and recipes.
+The [`dcp.schema.json`](./dcp.schema.json) schema lists the complete `compress.providers` field surface.
 
 ### Prompt Overrides
 
@@ -620,7 +620,7 @@ For the complete list with root cause analysis, see the [bug tracker](https://gi
 
 ## Changelog
 
-Full release history moved to [CHANGELOG.md](./CHANGELOG.md).
+Full release history is maintained in [`support-files/changelog/en/`](./support-files/changelog/en/).
 
 ---
 

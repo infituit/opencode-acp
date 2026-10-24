@@ -3,8 +3,8 @@
 #
 # Checks:
 #   1. Branch name matches YYYY-MM-DD_short-title
-#   2. If package.json version changed, CHANGELOG.md or CHANGELOG.zh-CN.md
-#      must be modified AND contain the new version in changelog
+#   2. If package.json version changed, both localized support-files changelog
+#      entries must be modified AND contain the new version
 #
 # Usage: ./scripts/ci/check-pr.sh [branch-name] [base-branch]
 #   branch-name defaults to $GITHUB_HEAD_REF or current branch
@@ -22,7 +22,10 @@ NC='\033[0m'
 
 errors=0
 warn() { echo -e "${YELLOW}⚠ $1${NC}"; }
-fail() { echo -e "${RED}✗ $1${NC}"; errors=$((errors + 1)); }
+fail() {
+	echo -e "${RED}✗ $1${NC}"
+	errors=$((errors + 1))
+}
 pass() { echo -e "${GREEN}✓ $1${NC}"; }
 
 echo "=== PR Validation ==="
@@ -33,10 +36,10 @@ echo ""
 # ── Check 1: Branch name convention ──────────────────────────
 echo "── Branch name convention ──"
 if echo "$BRANCH" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}_[a-z0-9.-]+$'; then
-    pass "Branch name matches YYYY-MM-DD_short-title"
+	pass "Branch name matches YYYY-MM-DD_short-title"
 else
-    fail "Branch name '$BRANCH' does not match YYYY-MM-DD_short-title (e.g., 2026-07-11_compress-baseline-fix)"
-    echo "  Required format: digits-digits-digits_lowercase-kebab-case"
+	fail "Branch name '$BRANCH' does not match YYYY-MM-DD_short-title (e.g., 2026-07-11_compress-baseline-fix)"
+	echo "  Required format: digits-digits-digits_lowercase-kebab-case"
 fi
 echo ""
 
@@ -55,45 +58,47 @@ process.stdin.on('end', () => {
 " 2>/dev/null || echo "")
 
 if [ -z "$CURRENT_VERSION" ]; then
-    warn "Could not read version from package.json — skipping changelog check"
+	warn "Could not read version from package.json — skipping changelog check"
 elif [ -z "$BASE_VERSION" ]; then
-    warn "Could not read version from $BASE — skipping changelog check"
+	warn "Could not read version from $BASE — skipping changelog check"
 elif [ "$CURRENT_VERSION" = "$BASE_VERSION" ]; then
-    pass "Version unchanged ($CURRENT_VERSION) — changelog check skipped"
+	pass "Version unchanged ($CURRENT_VERSION) — changelog check skipped"
 else
-    echo "  Version change: $BASE_VERSION → $CURRENT_VERSION"
+	echo "  Version change: $BASE_VERSION → $CURRENT_VERSION"
 
-    # Check if CHANGELOG.md or CHANGELOG.zh-CN.md was modified
-    CHANGELOG_CHANGED=$(git diff --name-only "$BASE"...HEAD -- CHANGELOG.md CHANGELOG.zh-CN.md 2>/dev/null | wc -l)
+	# Check if either localized support-files changelog directory was modified
+	CHANGELOG_CHANGED=$(git diff --name-only "$BASE"...HEAD -- support-files/changelog/en support-files/changelog/zh 2>/dev/null | wc -l)
 
-    if [ "$CHANGELOG_CHANGED" -eq 0 ]; then
-        fail "Version bumped ($BASE_VERSION → $CURRENT_VERSION) but no CHANGELOG update found"
-        echo "  CHANGELOG.md and CHANGELOG.zh-CN.md must contain the new version"
-    else
-        pass "CHANGELOG files modified — checking version string..."
+	if [ "$CHANGELOG_CHANGED" -eq 0 ]; then
+		fail "Version bumped ($BASE_VERSION → $CURRENT_VERSION) but no CHANGELOG update found"
+		echo "  support-files/changelog/en and support-files/changelog/zh must contain the new version"
+	else
+		pass "support-files changelog entries modified — checking version string..."
 
-        # Check that the new version appears in the changelog
-        if grep -q "v${CURRENT_VERSION}\|### v${CURRENT_VERSION}" CHANGELOG.md 2>/dev/null; then
-            pass "CHANGELOG.md contains v$CURRENT_VERSION"
-        else
-            fail "CHANGELOG.md does not contain '### v$CURRENT_VERSION'"
-        fi
+		# Check that both localized version files exist and contain the version
+		EN_CHANGELOG=$(find support-files/changelog/en -maxdepth 1 -type f -name "v${CURRENT_VERSION}_*.md" -print -quit 2>/dev/null || true)
+		if [ -n "$EN_CHANGELOG" ] && grep -q "Version: v${CURRENT_VERSION}" "$EN_CHANGELOG"; then
+			pass "$EN_CHANGELOG contains v$CURRENT_VERSION"
+		else
+			fail "support-files/changelog/en has no entry for v$CURRENT_VERSION"
+		fi
 
-        if grep -q "v${CURRENT_VERSION}\|### v${CURRENT_VERSION}" CHANGELOG.zh-CN.md 2>/dev/null; then
-            pass "CHANGELOG.zh-CN.md contains v$CURRENT_VERSION"
-        else
-            fail "CHANGELOG.zh-CN.md does not contain '### v$CURRENT_VERSION'"
-        fi
-    fi
+		ZH_CHANGELOG=$(find support-files/changelog/zh -maxdepth 1 -type f -name "v${CURRENT_VERSION}_*.md" -print -quit 2>/dev/null || true)
+		if [ -n "$ZH_CHANGELOG" ] && grep -q "Version: v${CURRENT_VERSION}" "$ZH_CHANGELOG"; then
+			pass "$ZH_CHANGELOG contains v$CURRENT_VERSION"
+		else
+			fail "support-files/changelog/zh has no entry for v$CURRENT_VERSION"
+		fi
+	fi
 fi
 echo ""
 
 # ── Summary ──────────────────────────────────────────────────
 echo "=== Summary ==="
 if [ "$errors" -eq 0 ]; then
-    echo -e "${GREEN}All checks passed ✓${NC}"
-    exit 0
+	echo -e "${GREEN}All checks passed ✓${NC}"
+	exit 0
 else
-    echo -e "${RED}$errors check(s) failed${NC}"
-    exit 1
+	echo -e "${RED}$errors check(s) failed${NC}"
+	exit 1
 fi
