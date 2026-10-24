@@ -38,8 +38,8 @@ A production-scale longitudinal study: 4.5 months, three hosts, 174,327 model ca
 
 <p align="center">
 <a href="https://www.npmjs.com/package/opencode-acp"><img src="https://img.shields.io/npm/v/opencode-acp.svg?style=flat-square" alt="npm"></a>
-<a href="https://github.com/ranxianglei/opencode-acp/blob/master/LICENSE"><img src="https://img.shields.io/npm/l/opencode-acp.svg?style=flat-square" alt="license"></a>
-<a href="https://github.com/ranxianglei/opencode-acp"><img src="https://img.shields.io/badge/GitHub-ranxianglei%2Fopencode--acp-181717?style=flat-square&logo=github" alt="GitHub"></a>
+<a href="https://github.com/infituit/opencode-acp/blob/master/LICENSE"><img src="https://img.shields.io/npm/l/opencode-acp.svg?style=flat-square" alt="license"></a>
+<a href="https://github.com/infituit/opencode-acp"><img src="https://img.shields.io/badge/GitHub-infituit%2Fopencode--acp-181717?style=flat-square&logo=github" alt="GitHub"></a>
 </p>
 
 <p align="center">
@@ -74,7 +74,7 @@ Pick by your client:
 | Client                                | Use                                                                                                                                                                                                                          |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **pi**                                | [`billion-context-pi`](https://github.com/ranxianglei/billion-context-pi) (in-process extension)                                                                                                                             |
-| **opencode 1.x**                      | [`opencode-acp`](https://github.com/ranxianglei/opencode-acp) (in-process extension)                                                                                                                                         |
+| **opencode 1.x**                      | [`opencode-acp`](https://github.com/infituit/opencode-acp) (in-process extension)                                                                                                                                            |
 | **opencode 2.0+**                     | [`billion-context`](https://github.com/ranxianglei/billion-context) — `bili opencode` (built-in V2 plugin) or `bili plugin install opencode` (self-spawning native plugin, no launcher); `opencode-acp` does not load on 2.x |
 | **omp**                               | [`billion-context`](https://github.com/ranxianglei/billion-context) via `bili omp` (built-in plugin)                                                                                                                         |
 | **everything else** (no context hook) | [`billion-context`](https://github.com/ranxianglei/billion-context) — `bili <client>` (launcher, preferred) or `/bili/` prefix                                                                                               |
@@ -320,7 +320,7 @@ Each level overrides the previous, so project settings take priority over global
 
 ```jsonc
 {
-    "$schema": "https://raw.githubusercontent.com/ranxianglei/opencode-acp/master/dcp.schema.json",
+    "$schema": "https://raw.githubusercontent.com/infituit/opencode-acp/master/dcp.schema.json",
     // Enable or disable the plugin
     "enabled": true,
     // Automatically update npm-installed ACP when a newer version is available
@@ -612,7 +612,7 @@ ACP is a drop-in replacement for DCP. To migrate:
 | 38     | CRITICAL | pruneToolOutputs/pruneToolInputs/pruneToolErrors mutate existing messages in-place -- invalidates LLM prefix cache, causing 89% of fresh input tokens to be wasted on cache-invalidating re-sends                                      |
 | 39     | HIGH     | Protected tool outputs (skill/task/todowrite) only soft-protected during compression -- appended to summary then pruned from context, losing semantic authority and susceptible to GC truncation. Fixed with hard-exclusion in v1.10.0 |
 
-For the complete list with root cause analysis, see the [bug tracker](https://github.com/ranxianglei/opencode-acp/issues).
+For the complete list with root cause analysis, see the [bug tracker](https://github.com/infituit/opencode-acp/issues).
 
 </details>
 

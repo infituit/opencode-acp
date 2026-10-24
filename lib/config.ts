@@ -515,7 +515,7 @@ function createDefaultConfig(): void {
 
     if (!existsSync(GLOBAL_CONFIG_PATH_JSONC)) {
         const configContent = `{
-  "$schema": "https://raw.githubusercontent.com/ranxianglei/opencode-acp/master/dcp.schema.json"
+  "$schema": "https://raw.githubusercontent.com/infituit/opencode-acp/master/dcp.schema.json"
 }
 `
         writeFileSync(GLOBAL_CONFIG_PATH_JSONC, configContent, "utf-8")

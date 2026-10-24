@@ -34,8 +34,8 @@ QQ群:
 
 <p align="center">
 <a href="https://www.npmjs.com/package/opencode-acp"><img src="https://img.shields.io/npm/v/opencode-acp.svg?style=flat-square" alt="npm"></a>
-<a href="https://github.com/ranxianglei/opencode-acp/blob/master/LICENSE"><img src="https://img.shields.io/npm/l/opencode-acp.svg?style=flat-square" alt="license"></a>
-<a href="https://github.com/ranxianglei/opencode-acp"><img src="https://img.shields.io/badge/GitHub-ranxianglei%2Fopencode--acp-181717?style=flat-square&logo=github" alt="GitHub"></a>
+<a href="https://github.com/infituit/opencode-acp/blob/master/LICENSE"><img src="https://img.shields.io/npm/l/opencode-acp.svg?style=flat-square" alt="license"></a>
+<a href="https://github.com/infituit/opencode-acp"><img src="https://img.shields.io/badge/GitHub-infituit%2Fopencode--acp-181717?style=flat-square&logo=github" alt="GitHub"></a>
 </p>
 
 <p align="center">
@@ -62,7 +62,7 @@ ACP 将上下文管理的所有权限全部交给模型自己，而不依靠外�
 | 客户端                        | 用这个                                                                                                                                                                                        |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **pi**                        | [`billion-context-pi`](https://github.com/ranxianglei/billion-context-pi)(进程内扩展)                                                                                                         |
-| **opencode 1.x**              | [`opencode-acp`](https://github.com/ranxianglei/opencode-acp)(进程内扩展)                                                                                                                     |
+| **opencode 1.x**              | [`opencode-acp`](https://github.com/infituit/opencode-acp)(进程内扩展)                                                                                                                        |
 | **opencode 2.0+**             | [`billion-context`](https://github.com/ranxianglei/billion-context) —— `bili opencode`(内置 V2 插件)或 `bili plugin install opencode`(自拉起原生插件,免启动器);`opencode-acp` 在 2.x 上不加载 |
 | **omp**                       | [`billion-context`](https://github.com/ranxianglei/billion-context),`bili omp`(内置插件)                                                                                                      |
 | **其余所有**(没有上下文 hook) | [`billion-context`](https://github.com/ranxianglei/billion-context) —— `bili <client>`(启动器,优先)或 `/bili/` 前缀                                                                           |
@@ -268,7 +268,7 @@ ACP 使用自己的配置文件，按以下顺序搜索：
 
 ```jsonc
 {
-    "$schema": "https://raw.githubusercontent.com/ranxianglei/opencode-acp/master/dcp.schema.json",
+    "$schema": "https://raw.githubusercontent.com/infituit/opencode-acp/master/dcp.schema.json",
     // Enable or disable the plugin
     "enabled": true,
     // 自动更新 npm 安装的 ACP：跟踪安装所用 dist-tag/规范（@stable 跟随 stable，@latest 跟随 latest）。
@@ -554,7 +554,7 @@ ACP 是 DCP 的直接替代品。迁移步骤：
 | 38     | 严重     | pruneToolOutputs/pruneToolInputs/pruneToolErrors 原地修改现有消息 — 破坏 LLM 前缀缓存，导致 89% 的新鲜输入 token 浪费在缓存失效的重发上 |
 | 39     | 高       | 受保护工具输出（skill/task/todowrite）在压缩时仅软保护 — 追加到摘要后从上下文中剪枝，丧失语义权威且易被 GC 截断。v1.10.0 用硬排除修复   |
 
-完整列表及根因分析，请参见 [Bug Tracker](https://github.com/ranxianglei/opencode-acp/issues)。
+完整列表及根因分析，请参见 [Bug Tracker](https://github.com/infituit/opencode-acp/issues)。
 
 </details>
 
