@@ -1,93 +1,121 @@
-name: Bug Report
-description: Report a bug with DCP. Please include debug logs.
+name: Bug 报告 / Bug Report
+description: 提交 ACP 缺陷报告 / Submit an ACP bug report
 title: "[Bug]: "
 labels: ["bug"]
 body:
     - type: markdown
       attributes:
           value: |
-              Thanks for taking the time to report a bug! To help us investigate, please include debug context logs.
+              感谢您填写缺陷报告！提交前请先搜索现有 issues，避免重复。
+              Thanks for reporting a bug! Please search existing issues before submitting to avoid duplicates.
 
-              **How to get debug logs:**
-              1. In your `dcp.jsonc`, add `"debug": true`
-              2. Send a message in your opencode session to trigger a new log
-              3. Navigate to `~/.config/opencode/logs/dcp/context/{last session ID}/{last timestamp}.json`
-              4. Attach or paste the relevant portion of the log below
+              本插件面向 OpenCode 1.x，不支持 OpenCode 2.x。V2 相关问题请提交至 [billion-context](https://github.com/ranxianglei/billion-context/issues)；影响本仓库 1.x 代码的问题仍在此报告。
+              This plugin targets OpenCode 1.x, not 2.x. Report V2 issues to [billion-context](https://github.com/ranxianglei/billion-context/issues); issues affecting this repository's 1.x code still belong here.
 
-              Debug can be enabled after experiencing the bug — you'll just have to send another message in your opencode session to trigger a new log json generation.
+              请勿公开安全漏洞细节、API keys、tokens 或未脱敏的会话内容。
+              Do not publish vulnerability details, API keys, tokens, or unredacted conversation content.
+
+    - type: checkboxes
+      id: checklist
+      attributes:
+          label: 提交前检查 / Pre-submission Checklist
+          description: 提交前请确认以下内容 / Please confirm the following before submitting
+          options:
+              - label: 我已搜索现有 issues，此 Bug 尚未被报告 / I have searched existing issues and this bug has not been reported
+                required: true
+              - label: 我已阅读 [文档 / Documentation](https://github.com/infituit/opencode-acp/blob/master/README.zh-CN.md)（[English](https://github.com/infituit/opencode-acp/blob/master/README.md)）
+                required: true
+              - label: 我已提供复现步骤；若无法稳定复现，已说明出现频率和触发条件 / I have provided reproduction steps, or described the frequency and conditions of an intermittent issue
+                required: true
 
     - type: textarea
       id: description
       attributes:
-          label: Bug Description
-          description: A clear and concise description of the bug.
-          placeholder: Describe what happened...
+          label: 问题描述 / Problem Description
+          description: 描述问题现象并提供最小复现步骤 / Describe what happened and provide minimal reproduction steps
+          placeholder: |
+              复现步骤 / Steps to reproduce:
+              1. 配置 ACP... / Configure ACP...
+              2. 在 OpenCode 会话中... / In an OpenCode session...
+              3. 出现错误... / Error occurs...
+
+              实际行为与出现频率 / Actual behavior and frequency:
       validations:
           required: true
 
     - type: textarea
       id: expected
       attributes:
-          label: Expected Behavior
-          description: What did you expect to happen?
-          placeholder: Describe what you expected...
-      validations:
-          required: true
-
-    - type: textarea
-      id: debug-logs
-      attributes:
-          label: Debug Context Logs
-          description: |
-              Paste the relevant portion of your debug context log JSON here.
-              Navigate to `~/.config/opencode/logs/dcp/context/{session ID}/{timestamp}.json`
-          render: json
-      validations:
-          required: true
-
-    - type: textarea
-      id: tool-call
-      attributes:
-          label: Tool Call Details
-          description: If applicable, describe what the tool call looked like and what the error was.
-          placeholder: "e.g. compress was called with startId: m0001, endId: m0010, and returned..."
-      validations:
-          required: false
-
-    - type: input
-      id: dcp-version
-      attributes:
-          label: DCP Version
-          description: Which version of `@tarquinen/opencode-dcp` are you using?
-          placeholder: "e.g. 3.0.4"
-      validations:
-          required: true
-
-    - type: input
-      id: opencode-version
-      attributes:
-          label: Opencode Version
-          description: Which version of opencode are you using?
-          placeholder: "e.g. 0.1.50"
+          label: 期望行为 / Expected Behavior
+          description: 描述您期望发生的正常行为 / Describe what you expected to happen
+          placeholder: 正常情况下应该... / Normally it should...
       validations:
           required: true
 
     - type: dropdown
-      id: model
+      id: component
       attributes:
-          label: Model
-          description: Which model are you using?
+          label: 涉及组件 / Affected Component
+          description: 问题出现在哪个功能或模块？/ Which feature or module is affected?
           options:
-              - Claude Sonnet 4
-              - Claude Opus 4
-              - Other (specify in description)
+              - 压缩与恢复 / Compression & Decompression
+              - 上下文提醒与 Token 统计 / Context Nudges & Token Accounting
+              - 消息保护与过滤 / Message Protection & Filtering
+              - 状态持久化与会话恢复 / State Persistence & Session Recovery
+              - 垃圾回收 / Garbage Collection
+              - 配置与权限 / Configuration & Permissions
+              - 安装与更新 / Installation & Updates
+              - 命令与通知 / Commands & Notifications
+              - 文档 / Documentation
+              - 其他或不确定 / Other or Unsure
       validations:
           required: true
 
     - type: textarea
+      id: environment
+      attributes:
+          label: 环境信息 / Environment
+          description: 请填写版本、安装来源及相关环境信息 / Provide versions, installation source, and environment details
+          value: |
+              - ACP 版本 / ACP Version:
+              - 安装来源或方式 / Installation Source or Method: (npm tag/version, Git URL/commit, local build)
+              - OpenCode 版本 / OpenCode Version:
+              - 操作系统与架构 / OS & Architecture:
+              - Node.js / Bun 版本（如适用）/ Version (if applicable):
+              - Provider / Model ID:
+              - 其他 OpenCode 插件 / Other OpenCode Plugins:
+      validations:
+          required: true
+
+    - type: textarea
+      id: configuration
+      attributes:
+          label: 相关配置 / Relevant Configuration
+          description: 贴出相关 ACP / OpenCode 配置，说明使用全局、自定义目录还是项目配置，并移除密钥 / Share relevant ACP / OpenCode settings, specify the config layer, and remove secrets
+          render: jsonc
+
+    - type: textarea
+      id: logs
+      attributes:
+          label: 相关日志 / Relevant Logs
+          description: |
+              日志默认位于 `~/.config/opencode/logs/acp/daily/<date>.log`。
+              Daily logs default to `~/.config/opencode/logs/acp/daily/<date>.log`.
+              如需上下文快照，在 `acp.jsonc` 中设置 `"debug": true`，重启 OpenCode 后复现，查看 `~/.config/opencode/logs/acp/context/<session-id>/<timestamp>.json`。
+              For context snapshots, set `"debug": true` in `acp.jsonc`, restart OpenCode, reproduce, and check `~/.config/opencode/logs/acp/context/<session-id>/<timestamp>.json`.
+              若设置了 `XDG_CONFIG_HOME`，用其替代 `~/.config`。只分享相关且已脱敏的片段；无法获取日志时请说明原因。
+              If `XDG_CONFIG_HOME` is set, it replaces `~/.config`. Share only relevant, sanitized excerpts; explain if logs are unavailable.
+          render: shell
+
+    - type: textarea
+      id: tool-call
+      attributes:
+          label: 工具调用详情 / Tool Call Details
+          description: 如涉及工具调用，请提供脱敏后的参数、返回值或错误 / If applicable, provide sanitized tool arguments, results, or errors
+          placeholder: "例如 / e.g. compress: startId=m00001, endId=m00010; error=..."
+
+    - type: textarea
       id: additional
       attributes:
-          label: Additional Context
-          description: Any other context, screenshots, or information that might help.
-      validations:
-          required: false
+          label: 附加信息 / Additional Context
+          description: 截图或其他有助于定位问题的信息（可直接拖拽已脱敏文件）/ Screenshots or other helpful context (drag & drop sanitized files)

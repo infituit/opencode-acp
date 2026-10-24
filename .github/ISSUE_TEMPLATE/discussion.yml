@@ -1,0 +1,80 @@
+name: 建议与讨论 / Discussion & Proposal
+description: 讨论 ACP 的改进方向或尚未确定方案的想法 / Discuss ACP improvements or ideas without a settled solution
+title: "[IDEA] "
+body:
+    - type: markdown
+      attributes:
+          value: |
+              欢迎提出你的想法和建议！开放性的讨论有助于项目持续演进。
+              Welcome to share your ideas! Open discussions help the project evolve.
+
+              提交前请先搜索现有 issues，避免重复。已确认的缺陷或明确的功能需求请使用对应模板。
+              Please search existing issues before submitting. Use the Bug Report or Feature Request form for confirmed defects or defined feature needs.
+
+    - type: checkboxes
+      id: checklist
+      attributes:
+          label: 提交前检查 / Pre-submission Checklist
+          options:
+              - label: 我已搜索现有 issues，此议题尚未被讨论 / I have searched existing issues and this topic has not been discussed
+                required: true
+
+    - type: dropdown
+      id: proposal_type
+      attributes:
+          label: 提案类型 / Proposal Type
+          description: 选择最符合的类型 / Select the most fitting type
+          multiple: true
+          options:
+              - 新功能建议 / New Feature
+              - 架构改进 / Architecture Improvement
+              - 性能优化 / Performance Optimization
+              - API 设计讨论 / API Design Discussion
+              - 工程实践改进 / Engineering Practice
+              - 使用问题 / Usage Question
+              - 其他讨论 / Other
+      validations:
+          required: true
+
+    - type: textarea
+      id: background
+      attributes:
+          label: 背景与动机 / Background & Motivation
+          description: 描述当前问题或局限性，以及为什么需要讨论 / Describe the current problem or limitation and why it needs discussion
+          placeholder: 目前存在的问题是... / The current problem is...
+      validations:
+          required: true
+
+    - type: textarea
+      id: proposal
+      attributes:
+          label: 提案描述 / Proposal Description
+          description: 详细描述你的想法、建议或讨论点 / Describe your idea, suggestion, or discussion point in detail
+          placeholder: 我的建议或问题是... / My proposal or question is...
+      validations:
+          required: true
+
+    - type: textarea
+      id: benefits
+      attributes:
+          label: 预期收益 / Expected Benefits
+          description: 这个改变会带来什么好处？会解决什么问题？/ What benefits will this bring? What problems will it solve?
+          placeholder: |
+              - 提升... / Improve...
+              - 解决... / Solve...
+
+    - type: textarea
+      id: implementation
+      attributes:
+          label: 可能的实现方式 / Possible Implementation
+          description: 如果有初步实现思路，请描述（可选）/ If you have initial implementation ideas, please describe them (optional)
+          placeholder: |
+              概念验证思路 / Proof-of-concept approach:
+              1. ...
+              2. ...
+
+    - type: textarea
+      id: additional
+      attributes:
+          label: 附加信息 / Additional Context
+          description: 补充其他上下文、参考资料或截图 / Add any other context, references, or screenshots
