@@ -245,7 +245,7 @@ ACP 使用自己的配置文件，按以下顺序搜索：
 
 每一层覆盖前一层，因此项目设置优先于全局设置。修改配置后请重启 OpenCode。
 
-> **📖 完整参数参考：** 请查看 [CONFIGURATION.zh-CN.md](./CONFIGURATION.zh-CN.md)（中文）或 [CONFIGURATION.md](./CONFIGURATION.md)（英文），包含每个可配置参数的类型、默认值和详细说明。
+> **📖 完整参数参考：** 配置参考文档正在重写；完整字段结构见 [`dcp.schema.json`](./dcp.schema.json)。
 
 > [!IMPORTANT]
 > **禁用 OpenCode 的内置自动压缩。** ACP 自行处理上下文管理 — OpenCode 的压缩与 ACP 冲突，可能导致问题（消息重新展开、压缩状态丢失）。请在 `opencode.json` 中添加：
@@ -427,7 +427,7 @@ ACP 使用自己的配置文件，按以下顺序搜索：
     // 消息过滤器——在 ACP 处理之前，从可见上下文中剥离/去重第三方插件注入
     // （例如 oh-my-opencode 的 system reminder）。被过滤的内容不计入上下文使用量。
     // 5 个内置 OMO 过滤器默认开启（v1.14.8+）；
-    // 按过滤器的参考与示例见 CONFIGURATION.zh-CN.md → messageFilters
+    // 完整的 messageFilters 结构见 dcp.schema.json。
     "messageFilters": {
         "enabled": true,
         "filters": {
@@ -468,7 +468,7 @@ ACP 使用自己的配置文件，按以下顺序搜索：
 
 不可覆盖：`permission`、已废弃的 `minContextLimit` / `modelMinLimits` 系列、以及扁平 `modelMaxLimits` / `modelMinLimits` 映射自身。注意：`modelMaxLimits` **未废弃** —— 仍完全支持，只是优先级低于嵌套的 `maxContextLimit`。
 
-完整 23 项字段清单与配方见 CONFIGURATION.zh-CN.md 的 [`compress.providers`](./CONFIGURATION.zh-CN.md#compressproviders) 参考节。
+完整的 `compress.providers` 字段结构见 [`dcp.schema.json`](./dcp.schema.json)。
 
 ### Prompt 覆盖
 
@@ -562,7 +562,7 @@ ACP 是 DCP 的直接替代品。迁移步骤：
 
 ## 更新日志
 
-完整版本历史见 [CHANGELOG.zh-CN.md](./CHANGELOG.zh-CN.md)。
+完整版本历史维护在 [`support-files/changelog/zh/`](./support-files/changelog/zh/)。
 
 ---
 

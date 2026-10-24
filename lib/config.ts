@@ -20,7 +20,7 @@ type Permission = "ask" | "allow" | "deny"
  *
  * Excluded:
  * - `permission` — resolved at tool registration time, before any model info exists
- * - `minContextLimit` / `modelMinLimits` — deprecated (see CONFIGURATION.md)
+ * - `minContextLimit` / `modelMinLimits` — deprecated (see the configuration schema)
  * - `modelMaxLimits`, `modelMinLimits`, `providers` — structural (maps themselves)
  * - `reasoning` — an object; cascade merges it field-wise (see
  *   `CompressReasoningConfig`), not by whole-value replacement, so it is handled

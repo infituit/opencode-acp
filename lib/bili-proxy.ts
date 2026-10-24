@@ -5,7 +5,7 @@
  * the proxy) does NOT set `BILLION_CONTEXT_PROXY` — that env var is only set
  * by the `bili <client>` launcher. The `/bili/` path prefix in a provider
  * baseURL is the documented zero-config self-detection signal (billion-context
- * CONFIGURATION.md): `http://<proxy-host>:<port>/bili/<upstream-url>`.
+ * configuration reference): `http://<proxy-host>:<port>/bili/<upstream-url>`.
  *
  * When a provider routes through the proxy, the proxy handles context
  * compression itself, so ACP must disable itself (same behavior as the
