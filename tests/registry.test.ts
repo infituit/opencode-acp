@@ -2,7 +2,7 @@ import "./test-env"
 /**
  * Tests for the real SessionStateRegistry (not the test stub).
  *
- * Covers the acceptance criteria from devlog/2026-07-24_per-session-state/REQ.md:
+ * Covers the session-registry acceptance criteria:
  *   - getOrCreate idempotency
  *   - per-session isolation of modelContextLimit (the #33 fix)
  *   - shared compressionTiming across sessions

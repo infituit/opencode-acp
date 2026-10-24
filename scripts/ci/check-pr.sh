@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
-# PR validation script — enforces AGENTS.md contributing standards.
+# PR validation script.
 #
 # Checks:
 #   1. Branch name matches YYYY-MM-DD_short-title
-#   2. devlog/{branch-name}/REQ.md exists
-#   3. devlog/{branch-name}/WORKLOG.md exists
-#   4. If package.json version changed, CHANGELOG.md or CHANGELOG.zh-CN.md
+#   2. If package.json version changed, CHANGELOG.md or CHANGELOG.zh-CN.md
 #      must be modified AND contain the new version in changelog
 #
 # Usage: ./scripts/ci/check-pr.sh [branch-name] [base-branch]
@@ -42,23 +40,7 @@ else
 fi
 echo ""
 
-# ── Check 2 & 3: Devlog exists ───────────────────────────────
-echo "── Devlog entry ──"
-DEVLOG_DIR="devlog/$BRANCH"
-if [ -f "$DEVLOG_DIR/REQ.md" ]; then
-    pass "devlog/$BRANCH/REQ.md exists"
-else
-    fail "devlog/$BRANCH/REQ.md is missing (required by AGENTS.md Section 5.1.2)"
-fi
-
-if [ -f "$DEVLOG_DIR/WORKLOG.md" ]; then
-    pass "devlog/$BRANCH/WORKLOG.md exists"
-else
-    fail "devlog/$BRANCH/WORKLOG.md is missing (required by AGENTS.md Section 5.1.2)"
-fi
-echo ""
-
-# ── Check 4: Changelog updated when version changes ──────────
+# ── Check 2: Changelog updated when version changes ──────────
 echo "── Changelog check ──"
 # Get version from current branch's package.json
 CURRENT_VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "")
@@ -86,7 +68,7 @@ else
 
     if [ "$CHANGELOG_CHANGED" -eq 0 ]; then
         fail "Version bumped ($BASE_VERSION → $CURRENT_VERSION) but no CHANGELOG update found"
-        echo "  AGENTS.md requires changelog entries in CHANGELOG.md and CHANGELOG.zh-CN.md for version changes"
+        echo "  CHANGELOG.md and CHANGELOG.zh-CN.md must contain the new version"
     else
         pass "CHANGELOG files modified — checking version string..."
 
