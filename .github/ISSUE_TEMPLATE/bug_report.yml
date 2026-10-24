@@ -9,8 +9,8 @@ body:
               感谢您填写缺陷报告！提交前请先搜索现有 issues，避免重复。
               Thanks for reporting a bug! Please search existing issues before submitting to avoid duplicates.
 
-              本插件面向 OpenCode 1.x，不支持 OpenCode 2.x。V2 相关问题请提交至 [billion-context](https://github.com/ranxianglei/billion-context/issues)；影响本仓库 1.x 代码的问题仍在此报告。
-              This plugin targets OpenCode 1.x, not 2.x. Report V2 issues to [billion-context](https://github.com/ranxianglei/billion-context/issues); issues affecting this repository's 1.x code still belong here.
+              本插件面向 OpenCode 1.x，不支持 OpenCode 2.x；V2 问题不在本仓库支持范围内。
+              This plugin targets OpenCode 1.x, not 2.x; V2 issues are outside this repository's support scope.
 
               请勿公开安全漏洞细节、API keys、tokens 或未脱敏的会话内容。
               Do not publish vulnerability details, API keys, tokens, or unredacted conversation content.

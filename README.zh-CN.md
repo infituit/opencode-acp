@@ -18,7 +18,7 @@ QQ群:
 
 ---
 
-> ⚠️ **你用的是 OpenCode 2.x?** 本扩展使用 OpenCode **V1** 插件 API,在 OpenCode 2.x 上**不会加载**。OpenCode 2.x 推荐的上下文管理方案是 [billion-context](https://github.com/ranxianglei/billion-context):`bili opencode`(启动器)或 `bili plugin install opencode`(原生插件,免启动器)。本扩展在 OpenCode **1.x** 上继续完整可用。
+> ⚠️ **你用的是 OpenCode 2.x?** 本扩展使用 OpenCode **V1** 插件 API，在 OpenCode 2.x 上**不会加载**。本扩展在 OpenCode **1.x** 上继续完整可用。
 
 ---
 
@@ -46,7 +46,7 @@ QQ群:
 
 ## 为什么选择 ACP
 
-ACP 将上下文管理的所有权限全部交给模型自己，而不依靠外部模型或各种复杂的机制去做上下文管理。它是迄今为止，市面上对上下文管理最好的实现。
+ACP 将上下文管理的所有权限交给模型自己，不需要额外模型或外部上下文管理服务。压缩、恢复和上下文统计都集中在同一个 OpenCode 插件中。
 
 这带来两个影响：
 
@@ -55,25 +55,11 @@ ACP 将上下文管理的所有权限全部交给模型自己，而不依靠外�
 
 ---
 
-## 该选哪个?
-
-按客户端选:
-
-| 客户端                        | 用这个                                                                                                                                                                                        |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **pi**                        | [`billion-context-pi`](https://github.com/ranxianglei/billion-context-pi)(进程内扩展)                                                                                                         |
-| **opencode 1.x**              | [`opencode-acp`](https://github.com/infituit/opencode-acp)(进程内扩展)                                                                                                                        |
-| **opencode 2.0+**             | [`billion-context`](https://github.com/ranxianglei/billion-context) —— `bili opencode`(内置 V2 插件)或 `bili plugin install opencode`(自拉起原生插件,免启动器);`opencode-acp` 在 2.x 上不加载 |
-| **omp**                       | [`billion-context`](https://github.com/ranxianglei/billion-context),`bili omp`(内置插件)                                                                                                      |
-| **其余所有**(没有上下文 hook) | [`billion-context`](https://github.com/ranxianglei/billion-context) —— `bili <client>`(启动器,优先)或 `/bili/` 前缀                                                                           |
-
----
-
 ## 实战验证
 
 真实工程中的上下文情况。
 
-**在 6 个活跃工程会话（11,000+ 次 API 调用）中，上下文 p90 稳定在 15 万–19 万（15–19%），p95 在 16 万–21 万（16–21%）—— 聚合缓存命中率达 91%。**（注意这是平均缓存命中率，不是单会话命中率——后面[对 Prompt 缓存的影响](#对-prompt-缓存的影响)会解释，这实际上比传统压缩算法大幅度节省了 token。）
+**在 6 个活跃工程会话（11,000+ 次 API 调用）中，上下文 p90 稳定在 15 万–19 万（15–19%），p95 在 16 万–21 万（16–21%）—— 聚合缓存命中率达 91%。** 缓存指标的含义见[对 Prompt 缓存的影响](#对-prompt-缓存的影响)。
 
 | 会话      | 时长        | 消息数 | API 调用 | 累计 token | 缓存命中率 | 上下文 p50  | 上下文 p90  | 上下文 p95  |
 | --------- | ----------- | ------ | -------- | ---------- | ---------- | ----------- | ----------- | ----------- |
@@ -92,7 +78,7 @@ ACP 将上下文管理的所有权限全部交给模型自己，而不依靠外�
 
 ## 安装
 
-> ⚠️ 这里安装的是 **V1** 插件 —— 面向 OpenCode **1.x**。在 OpenCode **2.x** 上该插件不会加载;请改用 [billion-context](https://github.com/ranxianglei/billion-context)(`bili opencode` 或 `bili plugin install opencode`)。
+> ⚠️ 这里安装的是面向 OpenCode **1.x** 的 **V1** 插件。在 OpenCode **2.x** 上不会加载。
 
 ```bash
 opencode plugin opencode-acp@stable --global
@@ -214,11 +200,9 @@ stateDiagram-v2
 
 历史上 ACP 修复了大量由 DCP 导致的低缓存命中率问题。目前整体缓存命中率约为 **91%**。
 
-相比传统压缩——只在 80–90% 时才压缩，一旦压缩就强制 100% 的上下文重新命中——ACP 的命中率实际上更高。
+ACP 保持对话前缀只追加，同时用紧凑 block 替换已压缩范围。这样可以保留服务商可复用的前缀，并将总上下文大部分时间维持在 **~10–15%**（以 1M 窗口计，p50 10 万、p90 15 万）。
 
-此外：ACP 大部分时间将总上下文维持在 **~10–15%**（p50 10 万、p90 15 万，以 1M 窗口计），而传统方案是 50–80%。因此总 token 节省远高于传统压缩。
-
-**结论：** ACP 在提高整体缓存命中率的同时，确保关键上下文信息不丢失。
+**结论：** ACP 保持上下文有界、保留可复用前缀，并支持按需恢复已压缩内容。
 
 ---
 

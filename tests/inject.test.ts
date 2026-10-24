@@ -2636,7 +2636,7 @@ test("issue #342 follow-up: unset minNudgeContextPercent falls back to the low 5
 
 // ── Issue #344: per-provider / per-model growth-nudge floor (nested providers.models) ──
 // compress.providers.{provider}.{field} and .models.{model}.{field} cascade
-// field-by-field: model > provider > global (billion-context-pi style).
+// field-by-field: model > provider > global.
 // These tests lock the resolution order, the 0-disables escape hatch, the
 // fallback for unknown provider/model ids, and the multi-turn gate behavior.
 
