@@ -9,7 +9,7 @@ scripts/
 .github/
 
 # Documentation (internal)
-TESTING.md
+VERIFICATION.md
 ANALYSIS.md
 docs/
 notes/

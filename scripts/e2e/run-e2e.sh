@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# E2E test runner for ACP compression.
+# E2E runtime verification for ACP compression.
 #
-# Runs scenario-based end-to-end tests:
+# Runs scenario-based runtime verification:
 #   1. Builds ACP
 #   2. Starts a fake LLM server
 #   3. Configures opencode with fake provider + local ACP plugin
