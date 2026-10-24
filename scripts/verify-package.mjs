@@ -209,7 +209,8 @@ function validatePackedFiles() {
         encoding: "utf8",
     })
 
-    const [result] = JSON.parse(output)
+    const parsed = JSON.parse(output)
+    const result = Array.isArray(parsed) ? parsed[0] : parsed[Object.keys(parsed)[0]]
     if (!result || !Array.isArray(result.files)) {
         fail("npm pack --dry-run --json did not return file metadata")
     }

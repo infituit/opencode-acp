@@ -43,13 +43,13 @@
     ],
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/ranxianglei/opencode-acp.git"
+        "url": "git+https://github.com/infituit/opencode-acp.git"
     },
     "bugs": {
-        "url": "https://github.com/ranxianglei/opencode-acp/issues"
+        "url": "https://github.com/infituit/opencode-acp/issues"
     },
-    "homepage": "https://github.com/ranxianglei/opencode-acp#readme",
-    "author": "ranxianglei",
+    "homepage": "https://github.com/infituit/opencode-acp#readme",
+    "author": "infituit",
     "license": "AGPL-3.0-or-later",
     "peerDependencies": {
         "@opencode-ai/plugin": ">=1.4.3"
