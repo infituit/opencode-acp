@@ -80,7 +80,7 @@ export interface CompressConfig {
      * Still honored until removed alongside `minContextLimit`.
      */
     modelMinLimits?: Record<string, number | `${number}%`>
-    /** Nested per-provider / per-model overrides (billion-context-pi style). Resolved field-by-field: model > provider > global. */
+    /** Nested per-provider / per-model overrides. Resolved field-by-field: model > provider > global. */
     providers?: Record<string, CompressProviderOverrides>
     /**
      * Fallback context window (absolute tokens) used when the model's limit is

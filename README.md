@@ -19,10 +19,8 @@ QQ Group:
 ---
 
 > ⚠️ **Using OpenCode 2.x?** This extension uses the OpenCode **V1** plugin
-> API and does **not** load on OpenCode 2.x. For OpenCode 2.x the recommended
-> context manager is [billion-context](https://github.com/ranxianglei/billion-context):
-> `bili opencode` (launcher) or `bili plugin install opencode` (native plugin,
-> no launcher). This extension remains fully supported on OpenCode **1.x**.
+> API and does **not** load on OpenCode 2.x. It remains fully supported on
+> OpenCode **1.x**.
 
 ---
 
@@ -50,9 +48,10 @@ A production-scale longitudinal study: 4.5 months, three hosts, 174,327 model ca
 
 ## Why ACP
 
-ACP hands all context-management authority to the model itself — not relying on
-external models or any complex external mechanism to do context management. It
-is, to date, the best context-management implementation on the market.
+ACP hands all context-management authority to the model itself — without
+requiring a separate model or an external context-management service. The
+implementation keeps compression, recovery, and context accounting in one
+OpenCode plugin.
 
 This brings two concrete effects:
 
@@ -67,29 +66,14 @@ This brings two concrete effects:
 
 ---
 
-## Which do I need?
-
-Pick by your client:
-
-| Client                                | Use                                                                                                                                                                                                                          |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **pi**                                | [`billion-context-pi`](https://github.com/ranxianglei/billion-context-pi) (in-process extension)                                                                                                                             |
-| **opencode 1.x**                      | [`opencode-acp`](https://github.com/infituit/opencode-acp) (in-process extension)                                                                                                                                            |
-| **opencode 2.0+**                     | [`billion-context`](https://github.com/ranxianglei/billion-context) — `bili opencode` (built-in V2 plugin) or `bili plugin install opencode` (self-spawning native plugin, no launcher); `opencode-acp` does not load on 2.x |
-| **omp**                               | [`billion-context`](https://github.com/ranxianglei/billion-context) via `bili omp` (built-in plugin)                                                                                                                         |
-| **everything else** (no context hook) | [`billion-context`](https://github.com/ranxianglei/billion-context) — `bili <client>` (launcher, preferred) or `/bili/` prefix                                                                                               |
-
----
-
 ## Proven at scale
 
 Real engineering context, in practice.
 
 **Across 6 active engineering sessions (11,000+ API calls), context p90 stays
 at 150K–190K (15–19%), p95 at 160K–210K (16–21%) of the 1M window — with an
-aggregate prompt-cache hit ratio of 91%.** (Why aggregate — not per-session —
-matters is explained in [Impact on Prompt Caching](#impact-on-prompt-caching),
-where it turns out to save far more tokens than traditional compression.)
+aggregate prompt-cache hit ratio of 91%.** The cache metric is explained in
+[Impact on Prompt Caching](#impact-on-prompt-caching).
 
 | Session   | Duration    | Messages | API calls | Cumulative | Cache hit | Context p50 | Context p90 | Context p95 |
 | --------- | ----------- | -------- | --------- | ---------- | --------- | ----------- | ----------- | ----------- |
@@ -109,10 +93,8 @@ across all other sessions.
 
 ## Installation
 
-> ⚠️ This installs the **V1** plugin — it targets OpenCode **1.x**. On
-> OpenCode **2.x** the plugin will not load; use
-> [billion-context](https://github.com/ranxianglei/billion-context) instead
-> (`bili opencode` or `bili plugin install opencode`).
+> ⚠️ This installs the **V1** plugin and targets OpenCode **1.x**. It does
+> not load on OpenCode **2.x**.
 
 ```bash
 opencode plugin opencode-acp@stable --global
@@ -261,16 +243,13 @@ Off by default for one release of burn-in. To enable:
 Historically, ACP has fixed many of the low-cache-hit-rate problems caused by
 DCP. The overall cache hit rate is now **~91%**.
 
-Compared to traditional compression — which only compresses at 80–90% and, once it
-compresses, forces 100% of the context to re-hit — ACP's hit rate is effectively
-higher.
+ACP keeps the conversation prefix append-only while compressed ranges are
+replaced by compact blocks. This preserves the provider's reusable prefix and
+keeps total context around **~10–15% most of the time** (p50 100K, p90 150K of
+the 1M window).
 
-Additionally, ACP keeps total context around **~10–15% most of the time** (p50
-100K, p90 150K of the 1M window), versus the traditional **50–80%**. So total
-token savings are far higher than traditional compression.
-
-**Conclusion:** ACP simultaneously raises the overall cache hit rate **and**
-ensures key context information is not lost.
+**Conclusion:** ACP keeps context bounded, preserves the reusable prefix, and
+retains compressed content for on-demand recovery.
 
 ---
 

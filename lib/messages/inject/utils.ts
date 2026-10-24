@@ -263,7 +263,7 @@ export const DEFAULT_MIN_NUDGE_CONTEXT_PERCENT = 5
 
 /**
  * Resolve the effective growth-nudge floor percent for the active model,
- * cascading field-by-field (billion-context-pi style):
+ * cascading field-by-field:
  *
  *   compress.providers[providerId].models[modelId].minNudgeContextPercent
  *     → compress.providers[providerId].minNudgeContextPercent
