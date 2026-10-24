@@ -2,7 +2,6 @@
  * /acp export command — user-initiated export of active compression-block
  * summaries to a markdown file.
  *
- * Design (see devlog/2026-08-03_acp-export-command/REQ.md):
  *   - Exports ACTIVE blocks only. Consumed/inactive blocks are already
  *     distilled into the T2/T3 blocks that superseded them.
  *   - Default tier selection = ALL active tiers (T1+T2+T3). A session may have
@@ -415,7 +414,7 @@ function formatExportSummary(
         lines.push("")
         lines.push(`Generated ${generatedAt.toISOString()}.`)
         lines.push(
-            "Review, edit, and commit as a devlog / AGENTS.md supplement — export is user-driven, never auto-injected.",
+            "Review, edit, and commit as project notes — export is user-driven, never auto-injected.",
         )
     }
     return lines.join("\n")

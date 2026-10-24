@@ -6,11 +6,9 @@ lib/
 node_modules/
 tests/
 scripts/
-devlog/
 .github/
 
 # Documentation (internal)
-AGENTS.md
 TESTING.md
 ANALYSIS.md
 docs/

@@ -52,7 +52,7 @@ STABLE_TARGET="$HOME/.cache/opencode/packages/opencode-acp@stable/node_modules/o
 # Legacy resolution path. Older opencode versions resolve "opencode-acp@latest" to
 # ~/.cache/opencode/node_modules/opencode-acp/ instead of the packages/@latest path.
 # If this directory exists, keep it in sync so deploys take effect regardless of
-# which resolution path the running opencode uses. (See AGENTS.md §3.4.)
+# which resolution path the running opencode uses.
 LEGACY_TARGET="$HOME/.cache/opencode/node_modules/opencode-acp"
 
 # ── Helpers ────────────────────────────────────────────────────────────────
