@@ -1,6 +1,6 @@
 {
     "name": "tier2-baseline-preserved-after-compress",
-      "description": "Issue #364 semantics: raw-message T1 captures (mNNNNN refs — all the fake LLM can emit) must NOT touch the tier cadence baselines. lastTier2NudgeTokens stays unset here because T2 never fires (each T1 compress auto-consumes the previous block, search.ts auto-detection, leaving 1 active T1 block) and captures no longer set it. The #235 invariant (baseline never reset to undefined once T2 has fired) is locked by the distill/conservative reset path in unit tests (tests/inject.test.ts phase 1-3 + the b-prefix contrast test); E2E coverage of that path needs fake LLM support for bNN block-ID refs (not yet implemented).",
+      "description": "Issue #364 semantics: raw-message T1 captures (mNNNNN refs — all the fake LLM can emit) must NOT touch the tier cadence baselines. lastTier2NudgeTokens stays unset here because T2 never fires (each T1 compress auto-consumes the previous block, search.ts auto-detection, leaving 1 active T1 block) and captures no longer set it. The #235 invariant (baseline never reset to undefined once T2 has fired) is outside this scenario; covering that distill path needs fake LLM support for bNN block-ID refs (not yet implemented).",
     "acpConfig": {
         "compress": {
             "minCompressRange": 0,

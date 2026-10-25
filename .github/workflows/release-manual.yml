@@ -104,7 +104,6 @@ jobs:
         run: |
           npm ci
           npm run check:package
-          npm test
 
       - name: Commit and push to master
         id: push

@@ -1,6 +1,6 @@
 {
     "name": "nudge-refire-after-compress",
-    "description": "Multi-turn nudge→compress regression: text turns grow context, ACP injects nudge, fake LLM compresses. Verifies nudge system works in multi-turn mode. Full re-nudge-after-compress (Issue #176) is tested by scenario 10 (autonomous) and unit tests.",
+    "description": "Multi-turn nudge→compress regression: text turns grow context, ACP injects nudge, fake LLM compresses. Verifies nudge system works in multi-turn mode. Full re-nudge-after-compress (Issue #176) is covered by scenario 10 (autonomous).",
     "acpConfig": {
         "compress": {
             "minCompressRange": 0,

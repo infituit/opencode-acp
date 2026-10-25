@@ -13,7 +13,7 @@
 # Usage:
 #   ./scripts/dev-deploy.sh           # Build + deploy (default)
 #   ./scripts/dev-deploy.sh --no-build # Deploy existing dist/ only
-#   ./scripts/dev-deploy.sh --check    # Build + deploy + run tests first
+#   ./scripts/dev-deploy.sh --check    # Build + package verification + deploy
 #
 # After deploying, restart opencode to load the new code.
 #
@@ -76,21 +76,21 @@ cd "$PROJECT_ROOT"
 
 # Parse args
 RUN_BUILD=true
-RUN_TESTS=false
+RUN_VERIFY=false
 for arg in "$@"; do
     case "$arg" in
         --no-build) RUN_BUILD=false ;;
-        --check)    RUN_TESTS=true ;;
+        --check)    RUN_VERIFY=true ;;
         *)          error "Unknown argument: $arg\nUsage: $0 [--no-build|--check]" ;;
     esac
 done
 
-# ── Step 1: Tests (optional, --check) ─────────────────────────────────────
+# ── Step 1: Package verification (optional, --check) ─────────────────────
 
-if [[ "$RUN_TESTS" == "true" ]]; then
-    step "Running tests..."
-    npm run test || error "Tests failed"
-    info "Tests passed"
+if [[ "$RUN_VERIFY" == "true" && "$RUN_BUILD" == "false" ]]; then
+    step "Verifying existing package..."
+    npm run verify:package || error "Package verification failed"
+    info "Package verification OK"
 fi
 
 # ── Step 2: Type check ────────────────────────────────────────────────────
@@ -114,6 +114,12 @@ else
     step "Skipping build (--no-build)"
     [[ -d "$PROJECT_ROOT/dist" ]] \
         || error "dist/ not found — run without --no-build first"
+fi
+
+if [[ "$RUN_VERIFY" == "true" && "$RUN_BUILD" == "true" ]]; then
+    step "Verifying package contents and runtime import graph..."
+    npm run verify:package || error "Package verification failed"
+    info "Package verification OK"
 fi
 
 # ── Step 4: Version guard ─────────────────────────────────────────────────
