@@ -19,6 +19,25 @@ import type {
 import type { Logger } from "../logger"
 import { serializePruneMessagesState } from "./utils"
 
+export interface NativeStateStorage {
+    get(key: string): Promise<unknown>
+    set(key: string, value: unknown): Promise<void>
+    scan?(options: { prefix: string; after?: string; limit?: number }): Promise<{
+        entries: ReadonlyArray<{ key: string; value: unknown }>
+        next?: string
+    }>
+}
+
+let nativeStateStorage: NativeStateStorage | undefined
+
+export function configureNativeStateStorage(storage: NativeStateStorage | undefined): void {
+    nativeStateStorage = storage
+}
+
+function nativeStateKey(sessionId: string): string {
+    return `sessions/${encodeURIComponent(sessionId)}`
+}
+
 /** Prune state as stored on disk */
 export interface PersistedPruneMessagesState {
     byMessageId: Record<string, PrunedMessageEntry>
@@ -122,6 +141,15 @@ async function writePersistedSessionState(
     logger: Logger,
     storageDir?: string,
 ): Promise<void> {
+    if (storageDir === undefined && nativeStateStorage) {
+        await nativeStateStorage.set(nativeStateKey(sessionId), state)
+        logger.info("Saved session state to OpenCode storage", {
+            sessionId,
+            totalTokensSaved: state.stats.totalPruneTokens,
+        })
+        return
+    }
+
     // Capture file path synchronously before any await — prevents race condition
     // when fire-and-forget saves execute after XDG_DATA_HOME has changed (tests).
     const filePath = getSessionFilePath(sessionId, storageDir)
@@ -284,19 +312,26 @@ export async function loadSessionState(
     storageDir?: string,
 ): Promise<PersistedSessionState | null> {
     try {
-        const filePath = getSessionFilePath(sessionId, storageDir)
+        let state: PersistedSessionState
+        if (storageDir === undefined && nativeStateStorage) {
+            const value = await nativeStateStorage.get(nativeStateKey(sessionId))
+            if (!value || typeof value !== "object") return null
+            state = value as PersistedSessionState
+        } else {
+            const filePath = getSessionFilePath(sessionId, storageDir)
 
-        if (!existsSync(filePath)) {
-            return null
+            if (!existsSync(filePath)) {
+                return null
+            }
+
+            const content = await fs.readFile(filePath, "utf-8")
+            state = JSON.parse(content) as PersistedSessionState
         }
-
-        const content = await fs.readFile(filePath, "utf-8")
-        const state = JSON.parse(content) as PersistedSessionState
 
         const hasPruneMessages = state?.prune?.messages && typeof state.prune.messages === "object"
         const hasNudgeFormat = state?.nudges && typeof state.nudges === "object"
         if (!state || !state.prune || !hasPruneMessages || !state.stats || !hasNudgeFormat) {
-            logger.warn("Invalid session state file, ignoring", {
+            logger.warn("Invalid persisted session state, ignoring", {
                 sessionId: sessionId,
             })
             return null
@@ -359,9 +394,12 @@ export async function loadSessionState(
             ;(state as any)._persistedLastCompaction = persistedLastCompaction
         }
 
-        logger.info("Loaded session state from disk", {
-            sessionId: sessionId,
-        })
+        logger.info(
+            nativeStateStorage && storageDir === undefined
+                ? "Loaded session state from OpenCode storage"
+                : "Loaded session state from disk",
+            { sessionId },
+        )
 
         return state
     } catch (error: any) {
@@ -392,6 +430,26 @@ export async function loadAllSessionStats(
     }
 
     try {
+        if (storageDir === undefined && nativeStateStorage?.scan) {
+            let cursor: string | undefined
+            do {
+                const page = await nativeStateStorage.scan({ prefix: "sessions/", after: cursor })
+                for (const entry of page.entries) {
+                    const state = entry.value as PersistedSessionState
+                    if (state?.stats?.totalPruneTokens && state?.prune) {
+                        result.totalTokens += state.stats.totalPruneTokens
+                        result.totalTools += Object.keys(state.prune.tools || {}).length
+                        result.totalMessages += Object.keys(
+                            state.prune.messages?.byMessageId || {},
+                        ).length
+                        result.sessionCount++
+                    }
+                }
+                cursor = page.next
+            } while (cursor)
+            return result
+        }
+
         const dir = getStorageDir(storageDir)
         if (!existsSync(dir)) {
             return result

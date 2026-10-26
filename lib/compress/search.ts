@@ -1,8 +1,10 @@
-import { tool } from "@opencode-ai/plugin"
+import type {
+    Info as V2ToolInfo,
+    ToolContext as V2ToolContext,
+} from "@opencode/plugin/promise/tool"
 import type { SessionState, WithParts } from "../state"
 import { formatBlockRef, formatMessageRef, parseBoundaryId, parseMessageRef } from "../message-ids"
 import { isIgnoredUserMessage } from "../messages/query"
-import { filterMessages } from "../messages/shape"
 import { estimateAllMessageTokensFast } from "../token-utils"
 import {
     type BoundaryReference,
@@ -11,13 +13,10 @@ import {
     type ToolFactoryContext,
     resolveToolContext,
 } from "./types"
+import { fromV2SessionMessages } from "../v2/messages"
 
 export async function fetchSessionMessages(client: any, sessionId: string): Promise<WithParts[]> {
-    const response = await client.session.messages({
-        path: { id: sessionId },
-    })
-
-    return filterMessages(response?.data || response)
+    return fromV2SessionMessages(await client.session.context({ sessionID: sessionId }), sessionId)
 }
 
 export function buildSearchContext(state: SessionState, rawMessages: WithParts[]): SearchContext {
@@ -63,7 +62,8 @@ export function resolveBoundaryIds(
     endId: string,
     logger?: { warn(message: string, data?: any): void },
 ): { startReference: BoundaryReference; endReference: BoundaryReference } {
-    const lookup = context.boundaryLookup ?? (context.boundaryLookup = buildBoundaryLookup(context, state))
+    const lookup =
+        context.boundaryLookup ?? (context.boundaryLookup = buildBoundaryLookup(context, state))
     const issues: string[] = []
     const parsedStartId = parseBoundaryId(startId)
     const parsedEndId = parseBoundaryId(endId)
@@ -211,7 +211,7 @@ function adjustBoundariesForToolPairs(
         const parts = Array.isArray(msg.parts) ? msg.parts : []
         for (const part of parts) {
             if (part.type !== "tool" || !part.callID) continue
-            if (part.tool === "compress") continue
+            if (part.tool === "acp_compress") continue
             callIdsInRange.add(part.callID)
         }
     }
@@ -501,56 +501,53 @@ function buildSearchPreview(text: string, firstTerm: string): string {
     return text.substring(0, 200) + (text.length > 200 ? "..." : "")
 }
 
-export function createSearchContextTool(factoryCtx: ToolFactoryContext): ReturnType<typeof tool> {
+export function createSearchContextToolV2(factoryCtx: ToolFactoryContext): V2ToolInfo {
     factoryCtx.prompts.reload()
 
-    return tool({
+    return {
+        name: "acp_search_context",
         description: SEARCH_CONTEXT_TOOL_DESCRIPTION,
-        args: {
-            query: tool.schema.string().describe("Search query — keywords or phrase to find"),
-            limit: tool.schema
-                .number()
-                .optional()
-                .describe("Maximum results to return (default: 10)"),
-            deep: tool.schema
-                .boolean()
-                .optional()
-                .describe(
-                    "Reserved for compatibility; the current search indexes active compressed block summaries.",
-                ),
+        input: {
+            type: "object",
+            properties: {
+                query: { type: "string", description: "Search query — keywords or phrase to find" },
+                limit: { type: "number", description: "Maximum results to return (default: 10)" },
+                deep: {
+                    type: "boolean",
+                    description:
+                        "Reserved for compatibility; the current search indexes active compressed block summaries.",
+                },
+            },
+            required: ["query"],
+            additionalProperties: false,
         },
-        async execute(args, toolCtx) {
+        async execute(input, toolCtx: V2ToolContext) {
             const ctx = resolveToolContext(factoryCtx, toolCtx.sessionID)
+            const args = input as { query?: string; limit?: number }
             const query = (args.query || "").toLowerCase().trim()
             const limit = args.limit ?? 10
 
-            if (!query) {
-                return "Error: query is required."
-            }
+            if (!query) return { content: "Error: query is required." }
 
-            const queryTerms = query.split(/\s+/).filter((t) => t.length > 0)
+            const queryTerms = query.split(/\s+/).filter((term) => term.length > 0)
             const results: SearchResult[] = []
             const MIN_RELEVANCE = 0.1
-
             const blocksById = ctx.state.prune.messages.blocksById
+
             for (const [blockId, block] of blocksById) {
                 if (!block.active) continue
 
                 const topic = (block.topic || "").toLowerCase()
                 const summary = (block.summary || "").toLowerCase()
-
-                // TF-based scoring: count ALL occurrences, weight by position
                 let relevance = 0
                 let termsHit = 0
                 for (const term of queryTerms) {
                     let termHit = false
-                    // Topic matches (high weight, capped per term)
                     const topicCount = countOccurrences(topic, term)
                     if (topicCount > 0) {
                         relevance += Math.min(topicCount * 0.15, 0.45)
                         termHit = true
                     }
-                    // Summary matches (lower weight, compounds with frequency)
                     const summaryCount = countOccurrences(summary, term)
                     if (summaryCount > 0) {
                         relevance += Math.min(summaryCount * 0.04, 0.2)
@@ -558,65 +555,48 @@ export function createSearchContextTool(factoryCtx: ToolFactoryContext): ReturnT
                     }
                     if (termHit) termsHit++
                 }
-                // All-terms-matched bonus: 20% boost
-                if (termsHit === queryTerms.length && queryTerms.length > 1) {
-                    relevance *= 1.2
-                }
-                // Exact phrase match bonus
+                if (termsHit === queryTerms.length && queryTerms.length > 1) relevance *= 1.2
                 if (queryTerms.length > 1 && query.includes(" ")) {
-                    if (topic.includes(query) || summary.includes(query)) {
-                        relevance += 0.25
-                    }
+                    if (topic.includes(query) || summary.includes(query)) relevance += 0.25
                 }
                 relevance = Math.min(relevance, 1.0)
-
                 if (relevance < MIN_RELEVANCE) continue
-
-                const origSummary = block.summary || ""
-                const preview = buildSearchPreview(origSummary, queryTerms[0])
 
                 results.push({
                     type: "block",
                     id: `b${blockId}`,
                     relevance,
                     label: block.topic || "(no topic)",
-                    preview,
-                    action: `→ decompress(b${blockId}) for full content`,
+                    preview: buildSearchPreview(block.summary || "", queryTerms[0] ?? ""),
+                    action: `→ acp_decompress({ blockId: "b${blockId}" }) for full content`,
                 })
             }
 
             results.sort((a, b) => b.relevance - a.relevance)
             const limited = results.slice(0, limit)
-
             if (limited.length === 0) {
-                return `No matches found for "${args.query}". Try different keywords.`
+                return { content: `No matches found for "${args.query}". Try different keywords.` }
             }
 
-            const lines: string[] = []
-            lines.push(
+            const lines = [
                 `🔍 Found ${results.length} matches for "${args.query}" (showing top ${limited.length}):`,
-            )
-            lines.push("")
-
+                "",
+            ]
             for (const result of limited) {
-                const icon = result.type === "block" ? "📦" : "📄"
                 const stars = "⭐".repeat(Math.ceil(result.relevance * 5))
                 lines.push(
-                    `${icon} [${result.id}] ${stars} (${result.relevance.toFixed(2)}) "${result.label}"`,
+                    `${result.type === "block" ? "📦" : "📄"} [${result.id}] ${stars} (${result.relevance.toFixed(2)}) "${result.label}"`,
+                    `   ${result.preview}`,
+                    `   ${result.action}`,
+                    "",
                 )
-                lines.push(`   ${result.preview}`)
-                lines.push(`   ${result.action}`)
-                lines.push("")
             }
 
             let output = lines.join("\n")
             if (output.length > 3000) {
-                output =
-                    output.substring(0, 3000) +
-                    "\n... (truncated, refine query for more specific results)"
+                output = `${output.substring(0, 3000)}\n... (truncated, refine query for more specific results)`
             }
-
-            return output
+            return { content: output }
         },
-    })
+    }
 }

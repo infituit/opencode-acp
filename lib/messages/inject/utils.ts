@@ -12,7 +12,7 @@ import {
     renderMessagePriorityGuidance,
 } from "../../prompts/extensions/nudge"
 import type { RuntimePrompts } from "../../prompts/store"
-import type { UserMessage } from "@opencode-ai/sdk/v2"
+import type { UserMessage } from "../../state/message-types"
 import {
     type CompressionPriorityMap,
     type MessagePriority,
@@ -206,7 +206,7 @@ export function isContextOverLimits(
         for (const msg of recentMessages) {
             if (msg.info.role === "assistant" && msg.parts) {
                 for (const part of msg.parts) {
-                    if (part.type === "tool" && part.tool === "compress") {
+                    if (part.type === "tool" && part.tool === "acp_compress") {
                         overMaxLimit = false
                         break
                     }
@@ -684,7 +684,7 @@ export function estimateContextComposition(
                 // summaryTokens, not toolTokens. The summary text lives in
                 // part.state.input.content[].summary.
                 let summaryPartTokens = 0
-                if (toolName === "compress") {
+                if (toolName === "acp_compress") {
                     const input = (part as any)?.state?.input
                     if (input?.content && Array.isArray(input.content)) {
                         for (const entry of input.content) {

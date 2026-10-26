@@ -27,6 +27,7 @@ import {
     collectTurnNudgeAnchors,
 } from "./utils"
 import { parseMessageRef, formatMessageRef } from "../message-ids"
+import { fetchV2SessionMessages } from "../v2/messages"
 
 /**
  * Per-turn state update (compaction detection + turn count). Extracted from the
@@ -107,7 +108,7 @@ export class SessionStateRegistry {
 
     /**
      * Best-effort one-time seed from the host's provider catalog
-     * (`client.config.providers()` → GET /config/providers). Never throws;
+     * V2 model catalog. Never throws; returns the number of model-limit entries recorded.
      * returns the number of model-limit entries recorded.
      */
     hydrateModelLimitsFromClient(client: unknown): Promise<number> {
@@ -363,14 +364,9 @@ export async function ensureSessionInitialized(
                             }
                         }
                     }
-                    const response = parent
-                        ? await client.session.messages({ path: { id: parentSessionId } })
-                        : undefined
-                    const parentMessages = Array.isArray(response?.data)
-                        ? response.data
-                        : Array.isArray(response)
-                          ? response
-                          : []
+                    const parentMessages = parent
+                        ? await fetchV2SessionMessages(client, parentSessionId)
+                        : []
                     if (parent && parentMessages.length > 0) {
                         // Standard subagents skip their first user prompt when
                         // assigning refs. A copied fork needs that prompt to

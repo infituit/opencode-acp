@@ -29,13 +29,6 @@ export function restoreCompressionState(state: SessionState, snapshot: Compressi
 }
 
 interface RunContext {
-    ask(input: {
-        permission: string
-        patterns: string[]
-        always: string[]
-        metadata: Record<string, unknown>
-    }): Promise<void>
-    metadata(input: { title: string }): void
     sessionID: string
 }
 
@@ -56,14 +49,7 @@ export async function prepareSession(
     toolCtx: RunContext,
     title: string,
 ): Promise<PreparedSession> {
-    await toolCtx.ask({
-        permission: "compress",
-        patterns: ["*"],
-        always: ["*"],
-        metadata: {},
-    })
-
-    toolCtx.metadata({ title })
+    await ctx.assertPermission(toolCtx.sessionID)
 
     const rawMessages = await fetchSessionMessages(ctx.client, toolCtx.sessionID)
 

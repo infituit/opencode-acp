@@ -1,4 +1,4 @@
-import type { Part } from "@opencode-ai/sdk/v2"
+import type { Part } from "../state/message-types"
 import type { CompressionBlock, SessionState, WithParts } from "../state"
 import { hasMeaningfulContent } from "./parts"
 
@@ -89,11 +89,24 @@ export function hideConsumedCompressCalls(state: SessionState, messages: WithPar
     const { allBlockCallIds, liveRangeKeysByCallId, activeCallIds } = cached
 
     const lastOrphanedCallIds: string[] = []
-    for (let i = messages.length - 1; i >= 0 && lastOrphanedCallIds.length < KEEP_LAST_ORPHANED; i--) {
+    for (
+        let i = messages.length - 1;
+        i >= 0 && lastOrphanedCallIds.length < KEEP_LAST_ORPHANED;
+        i--
+    ) {
         const parts = Array.isArray(messages[i]?.parts) ? messages[i]!.parts : []
-        for (let j = parts.length - 1; j >= 0 && lastOrphanedCallIds.length < KEEP_LAST_ORPHANED; j--) {
+        for (
+            let j = parts.length - 1;
+            j >= 0 && lastOrphanedCallIds.length < KEEP_LAST_ORPHANED;
+            j--
+        ) {
             const p = parts[j]!
-            if (p.type === "tool" && p.tool === "compress" && p.callID && !allBlockCallIds.has(p.callID)) {
+            if (
+                p.type === "tool" &&
+                p.tool === "acp_compress" &&
+                p.callID &&
+                !allBlockCallIds.has(p.callID)
+            ) {
                 lastOrphanedCallIds.push(p.callID)
             }
         }
@@ -108,7 +121,7 @@ export function hideConsumedCompressCalls(state: SessionState, messages: WithPar
         let changed = false
         const remaining: Part[] = []
         for (const p of parts) {
-            if (p.type === "tool" && p.tool === "compress") {
+            if (p.type === "tool" && p.tool === "acp_compress") {
                 if (!p.callID || !keepCallIds.has(p.callID)) {
                     hidden++
                     changed = true

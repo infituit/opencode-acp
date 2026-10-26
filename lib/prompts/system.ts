@@ -49,7 +49,7 @@ You operate in a context-constrained environment. All compression serves the pri
 
 ACP TAGS
 
-Each message in the conversation is annotated with a <dcp-message-id> tag showing its reference ID, approximate token size, and content type. For example: <dcp-message-id tokens="2.1K" type="tool:bash">m00175</dcp-message-id>. Use these annotations to assess which messages are consuming the most context and prioritize compression accordingly. The token size is approximate — treat it as a relative guide, not an exact count. You may also see <dcp-system-reminder> tags — these are system directives. Treat all tags as boundary metadata, not as tool-result content.
+Each message in the conversation is annotated with a &lt;dcp-message-id&gt; tag showing its reference ID, approximate token size, and content type. For example: &lt;dcp-message-id tokens="2.1K" type="tool:bash"&gt;m00175&lt;/dcp-message-id&gt;. Use these annotations to assess which messages are consuming the most context and prioritize compression accordingly. The token size is approximate — treat it as a relative guide, not an exact count. You may also see &lt;dcp-system-reminder&gt; tags — these are system directives. Treat all tags as boundary metadata, not as tool-result content.
 
 COMPRESSION SUMMARIES IN CONTEXT
 
@@ -66,9 +66,9 @@ TOOLS
 
 You have five context-management tools:
 
-- \`compress\` — Replace a contiguous range of older conversation with a single detailed summary you write. Use when content is genuinely consumed (no longer needed for the current task step). Single range: \`compress({ topic: "API exploration", content: [{ startId: "m00150", endId: "m00220", summary: "..." }] })\`. Batch (multiple unrelated ranges, each with its own topic): \`compress({ content: [{ topic: "Auth", startId: "m00150", endId: "m00220", summary: "..." }, { topic: "Deploy", startId: "m00300", endId: "m00350", summary: "..." }] })\`.
-- \`decompress\` — Restore a previously compressed block's content. By default restores one tier up (T2→T1 summaries, not raw messages). Use \`full: true\` to restore all the way to original messages. Use \`toFile\` to write to file instead of inflating context. Example: \`decompress({ blockId: "b5" })\` or \`decompress({ blockId: "b5", toFile: "path" })\` or \`decompress({ blockId: "b5", full: true })\`.
-- \`search_context\` — Search compressed block summaries (and optionally visible messages) by keyword. Use BEFORE decompressing to find the right block. Example: \`search_context({ query: "auth token refresh" })\`.
+- \`acp_compress\` — Replace a contiguous range of older conversation with a single detailed summary you write. Use when content is genuinely consumed (no longer needed for the current task step). Single range: \`acp_compress({ topic: "API exploration", content: [{ startId: "m00150", endId: "m00220", summary: "..." }] })\`. Batch (multiple unrelated ranges, each with its own topic): \`acp_compress({ content: [{ topic: "Auth", startId: "m00150", endId: "m00220", summary: "..." }, { topic: "Deploy", startId: "m00300", endId: "m00350", summary: "..." }] })\`.
+- \`acp_decompress\` — Restore a previously compressed block's content. By default restores one tier up (T2→T1 summaries, not raw messages). Use \`full: true\` to restore all the way to original messages. Use \`toFile\` to write to file instead of inflating context. Example: \`acp_decompress({ blockId: "b5" })\` or \`acp_decompress({ blockId: "b5", toFile: "path" })\` or \`acp_decompress({ blockId: "b5", full: true })\`.
+- \`acp_search_context\` — Search compressed block summaries (and optionally visible messages) by keyword. Use BEFORE decompressing to find the right block. Example: \`acp_search_context({ query: "auth token refresh" })\`.
 ${acpStatusToolLine}
 
 COMPRESSION PHILOSOPHY
@@ -106,7 +106,7 @@ Summaries accumulate as the session grows. When tier-1 summaries pile up, the sy
 - Tier 2: Distillation of old tier-1 block summaries. Uses TIER 2 DISTILLATION rules (decisions/outcomes only, drop paths/code/process).
 - Tier 3: Ultra-condensation of tier-2 summaries. Uses TIER 3 CONDENSATION rules (bare facts, 1-3 lines per block).
 
-To compress blocks: use block IDs as boundaries: \`compress({ content: [{ startId: "b3", endId: "b15", summary: "..." }] })\`. Multiple entries create separate blocks: \`compress({ content: [{ startId: "b3", endId: "b10", summary: "..." }, { startId: "b11", endId: "b20", summary: "..." }] })\`. This deactivates the consumed blocks and creates a new higher-tier block per entry. The system prompt at the trigger tells you which rules to follow.
+ To compress blocks: use block IDs as boundaries: \`acp_compress({ content: [{ startId: "b3", endId: "b15", summary: "..." }] })\`. Multiple entries create separate blocks: \`acp_compress({ content: [{ startId: "b3", endId: "b10", summary: "..." }, { startId: "b11", endId: "b20", summary: "..." }] })\`. This deactivates the consumed blocks and creates a new higher-tier block per entry. The system prompt at the trigger tells you which rules to follow.
 
 If you are unsure which \`mNNNNN\` refs are still compressible, or which blocks have already consumed which ranges, call \`acp_status\` first. It returns the visible context breakdown and the compressed block list.
 

@@ -47,7 +47,7 @@ import { formatTokenCount } from "../ui/utils"
 import { isIgnoredUserMessage } from "../messages/query"
 import { isMessageCompacted } from "../state/utils"
 import { countTokens, extractCompletedToolOutput, getCurrentParams } from "../token-utils"
-import type { AssistantMessage, TextPart, ToolPart } from "@opencode-ai/sdk/v2"
+import type { AssistantMessage, TextPart, ToolPart } from "../state/message-types"
 
 export interface ContextCommandContext {
     client: any

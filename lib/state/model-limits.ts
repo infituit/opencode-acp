@@ -40,34 +40,32 @@ export function createModelLimitCatalog(): ModelLimitCatalog {
             return modelLimits.get(`${providerId}/${modelId}`)
         },
         /**
-         * Best-effort one-time seed from the host's provider catalog
-         * (`client.config.providers()` → GET /config/providers). Never throws;
+         * Best-effort one-time seed from the V2 model catalog. Never throws;
          * returns the number of model-limit entries recorded.
          */
         async hydrateFromClient(client: unknown): Promise<number> {
             try {
-                const config = client as {
-                    config?: { providers?: () => Promise<{ data?: unknown }> }
+                const v2Client = client as {
+                    model?: { list?: () => Promise<ReadonlyArray<unknown>> }
                 }
-                const result = await config.config?.providers?.()
-                const payload = result as { data?: { providers?: unknown } } | undefined
-                const providers = payload?.data?.providers
-                if (!Array.isArray(providers)) return 0
+                const models = await v2Client.model!.list!()
                 let recorded = 0
-                for (const provider of providers) {
-                    const { id, models } = (provider ?? {}) as {
+                for (const value of models) {
+                    const model = value as {
+                        providerID?: unknown
                         id?: unknown
-                        models?: Record<string, unknown>
+                        limit?: { context?: unknown }
                     }
-                    if (typeof id !== "string" || !models) continue
-                    for (const [modelId, model] of Object.entries(models)) {
-                        const limit = (model as { limit?: { context?: unknown } } | null)?.limit
-                        const context = limit?.context
-                        if (typeof context === "number" && context > 0) {
-                            modelLimits.set(`${id}/${modelId}`, context)
-                            recorded++
-                        }
+                    if (
+                        typeof model.providerID !== "string" ||
+                        typeof model.id !== "string" ||
+                        typeof model.limit?.context !== "number" ||
+                        model.limit.context <= 0
+                    ) {
+                        continue
                     }
+                    modelLimits.set(`${model.providerID}/${model.id}`, model.limit.context)
+                    recorded++
                 }
                 return recorded
             } catch {

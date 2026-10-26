@@ -2,12 +2,8 @@ import type { Logger } from "../../logger"
 import type { PluginConfig } from "../../config"
 import type { SessionState, WithParts } from "../../state/types"
 import type { CompressionBlock } from "../../state/types"
-import type { Part } from "@opencode-ai/sdk/v2"
-import type {
-    QualityGateContext,
-    QualityGateResult,
-    QualityReport,
-} from "./types"
+import type { Part } from "../../state/message-types"
+import type { QualityGateContext, QualityGateResult, QualityReport } from "./types"
 import type { NotificationEntry } from "../pipeline"
 import { ensureBuiltinGatesRegistered } from "./algorithms"
 import { getQualityGate } from "./registry"
@@ -25,14 +21,16 @@ function extractMessageText(parts: Part[] | undefined): string {
             text += part.text + "\n"
         } else if (part.type === "tool") {
             const state = part.state
-            const input = state.status === "completed" && typeof state.input === "object"
-                ? JSON.stringify(state.input).slice(0, TOOL_INPUT_MAX_CHARS)
-                : ""
-            const output = state.status === "completed" && typeof state.output === "string"
-                ? state.output.slice(0, TOOL_OUTPUT_MAX_CHARS)
-                : state.status === "completed" && typeof state.output === "object"
-                  ? JSON.stringify(state.output).slice(0, TOOL_OUTPUT_MAX_CHARS)
-                  : ""
+            const input =
+                state.status === "completed" && typeof state.input === "object"
+                    ? JSON.stringify(state.input).slice(0, TOOL_INPUT_MAX_CHARS)
+                    : ""
+            const output =
+                state.status === "completed" && typeof state.output === "string"
+                    ? state.output.slice(0, TOOL_OUTPUT_MAX_CHARS)
+                    : state.status === "completed" && typeof state.output === "object"
+                      ? JSON.stringify(state.output).slice(0, TOOL_OUTPUT_MAX_CHARS)
+                      : ""
             text += `[tool:${part.tool}] ${input}\n${output}\n`
         }
     }

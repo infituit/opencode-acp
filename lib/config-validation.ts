@@ -21,7 +21,7 @@ export const VALID_CONFIG_KEYS = new Set([
     "commands",
     "commands.enabled",
     "commands.protectedTools",
-    "compress",
+    "acp_compress",
     "compress.permission",
     "compress.showCompression",
     "compress.summaryBuffer",
@@ -252,7 +252,7 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
     if (compress !== undefined) {
         if (typeof compress !== "object" || compress === null || Array.isArray(compress)) {
             errors.push({
-                key: "compress",
+                key: "acp_compress",
                 expected: "object",
                 actual: typeof compress,
             })

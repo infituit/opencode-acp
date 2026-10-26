@@ -1,5 +1,5 @@
 import { SessionState, WithParts } from "../state"
-import type { AssistantMessage } from "@opencode-ai/sdk/v2"
+import type { AssistantMessage } from "../state/message-types"
 import type { PluginConfig } from "../config"
 import { Logger } from "../logger"
 import {
@@ -165,7 +165,7 @@ export function enforceContextBudget(
         for (const part of parts) {
             if (part?.type !== "tool") continue
             if (part.state?.status !== "completed") continue
-            if (part.tool === "compress") continue
+            if (part.tool === "acp_compress") continue
             if (protectedTools.has(part.tool)) continue
 
             const content = extractCompletedToolOutput(part)
@@ -195,9 +195,7 @@ export function enforceContextBudget(
         const prefix = c.content.slice(0, KEEP_PREFIX_CHARS)
         const suffix = c.content.slice(-KEEP_SUFFIX_CHARS)
         const truncated =
-            prefix +
-            `\n\n...${TRUNCATION_MARKER} — original ~${c.tokens} tokens]...\n\n` +
-            suffix
+            prefix + `\n\n...${TRUNCATION_MARKER} — original ~${c.tokens} tokens]...\n\n` + suffix
         // Content just over the 4000-char threshold: prefix and suffix
         // overlap and the marker line makes the "truncated" form LONGER.
         // Skip it (phase 2 may still clear it) instead of growing it.

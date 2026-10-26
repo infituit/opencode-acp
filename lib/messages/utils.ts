@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto"
 import type { SessionState, WithParts } from "../state"
 import { isMessageCompacted } from "../state/utils"
-import type { AssistantMessage, Message, UserMessage } from "@opencode-ai/sdk/v2"
+import type { AssistantMessage, Message, UserMessage } from "../state/message-types"
 
 const SUMMARY_ID_HASH_LENGTH = 16
 
@@ -251,9 +251,7 @@ export const stripLeakedTrailingRefs = (
             ? rawMessageBound
             : null
     const blockBound =
-        typeof rawBlockBound === "number" && Number.isInteger(rawBlockBound)
-            ? rawBlockBound
-            : null
+        typeof rawBlockBound === "number" && Number.isInteger(rawBlockBound) ? rawBlockBound : null
     if (messageBound === null && blockBound === null) {
         return text
     }
@@ -313,7 +311,8 @@ export const dropEmptyMessages = (messages: WithParts[]): number => {
         const isEmpty = parts.every(
             (part) =>
                 part.type === "text" &&
-                ((typeof part.text !== "string" || part.text.trim().length === 0) ||
+                (typeof part.text !== "string" ||
+                    part.text.trim().length === 0 ||
                     (part as { ignored?: boolean }).ignored === true),
         )
         if (isEmpty) {

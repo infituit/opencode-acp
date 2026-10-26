@@ -57,6 +57,7 @@ import { cacheSystemPromptTokens } from "./ui/utils"
 import { runBatchCleanup } from "./gc/merge"
 import { getCurrentTokenUsage } from "./token-utils"
 import { clearSmartPlanSession, recordVisibleMessages } from "./compress/smart-plan"
+import { fetchSessionMessages } from "./compress/search"
 
 const INTERNAL_AGENT_SIGNATURES = [
     "You are a title generator",
@@ -406,16 +407,6 @@ export function createChatMessageTransformHandler(
                       // ignores the flag) → phantom turn → compress → notification →
                       // infinite loop. Use logger.debug + toast instead.
                       logger.debug(`[ACP Debug] Nudge injected:\n${text}`)
-                      client.tui
-                          .showToast({
-                              body: {
-                                  title: "ACP: Nudge Injected",
-                                  message: text.slice(0, 500),
-                                  variant: "info",
-                                  duration: 5000,
-                              },
-                          })
-                          .catch(() => {})
                   }
                 : undefined,
             prePruneTokens,
@@ -562,10 +553,7 @@ export function createCommandExecuteHandler(
         }
 
         if (input.command === "acp" || input.command === "dcp") {
-            const messagesResponse = await client.session.messages({
-                path: { id: input.sessionID },
-            })
-            const messages = filterMessages(messagesResponse.data || messagesResponse)
+            const messages = await fetchSessionMessages(client, input.sessionID)
 
             const state = await registry.getOrCreate(client, input.sessionID, messages, config)
 
@@ -674,7 +662,7 @@ export function createEventHandler(registry: SessionStateRegistry, logger: Logge
         }
 
         const part = input.event.properties?.part
-        if (part?.type !== "tool" || part.tool !== "compress") {
+        if (part?.type !== "tool" || part.tool !== "acp_compress") {
             return
         }
 

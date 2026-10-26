@@ -91,7 +91,7 @@ export function dropCompressReasoning(messages: WithParts[], threshold: number):
         let reasoningLength = 0
 
         for (const part of parts) {
-            if (part.type === "tool" && part.tool === "compress") {
+            if (part.type === "tool" && part.tool === "acp_compress") {
                 hasCompressTool = true
             } else if (part.type === "reasoning") {
                 reasoningLength += part.text.length
