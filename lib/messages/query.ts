@@ -4,7 +4,12 @@ import { isMessageWithInfo } from "./shape"
 
 export function isSyntheticMessage(message: WithParts): boolean {
     const id = message?.info?.id
-    return typeof id === "string" && (id.startsWith("msg_dcp_summary_") || id.startsWith("msg_dcp_text_") || id.startsWith("msg_acp_recap_"))
+    return (
+        typeof id === "string" &&
+        (id.startsWith("msg_dcp_summary_") ||
+            id.startsWith("msg_dcp_text_") ||
+            id.startsWith("msg_acp_recap_"))
+    )
 }
 
 export const getLastUserMessage = (
@@ -36,7 +41,9 @@ export const messageHasCompress = (message: WithParts): boolean => {
     const parts = Array.isArray(message.parts) ? message.parts : []
     return parts.some(
         (part) =>
-            part.type === "tool" && part.tool === "compress" && part.state?.status === "completed",
+            part.type === "tool" &&
+            part.tool === "acp_compress" &&
+            part.state?.status === "completed",
     )
 }
 
@@ -61,7 +68,7 @@ export const messageHasCompressAttempt = (message: WithParts): boolean => {
     }
 
     const parts = Array.isArray(message.parts) ? message.parts : []
-    return parts.some((part) => part.type === "tool" && part.tool === "compress")
+    return parts.some((part) => part.type === "tool" && part.tool === "acp_compress")
 }
 
 /**
@@ -90,7 +97,7 @@ export const isCaptureOnlyCompress = (message: WithParts | undefined): boolean =
     const parts = Array.isArray(message.parts) ? message.parts : []
     let sawBoundary = false
     for (const part of parts) {
-        if (!(part.type === "tool" && part.tool === "compress")) {
+        if (!(part.type === "tool" && part.tool === "acp_compress")) {
             continue
         }
         for (const startId of extractCompressBoundaryIds(part.state?.input)) {

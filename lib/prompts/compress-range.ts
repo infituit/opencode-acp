@@ -32,7 +32,7 @@ You specify boundaries by ID using the injected IDs visible in the conversation:
 - \`mNNNNN\` IDs identify raw messages
 - \`bN\` IDs identify previously compressed blocks
 
-Each message has an ID inside XML metadata tags like \`<dcp-message-id>...</dcp-message-id>\`.
+Each message has an ID inside XML metadata tags like \`&lt;dcp-message-id&gt;...&lt;/dcp-message-id&gt;\`.
 The same ID tag appears in every tool output of the message it belongs to — each unique ID identifies one complete message.
 Treat these tags as boundary metadata only, not as tool result content.
 
@@ -50,7 +50,7 @@ When multiple independent ranges are ready and their boundaries do not overlap, 
 When the ranges cover unrelated topics, give each entry its own \`topic\` for better summary quality — do not force unrelated content under a single shared topic. Omit the top-level \`topic\` when every entry has its own. Use the top-level \`topic\` only as a fallback when entries don't specify one.
 
 \`\`\`
-compress({ content: [
+acp_compress({ content: [
   { topic: "Auth System Exploration", startId: "m00010", endId: "m00050", summary: "..." },
   { topic: "Bug Hunt", startId: "m00060", endId: "m00080", summary: "..." },
   { topic: "Deployment", startId: "m00090", endId: "m00110", summary: "..." },

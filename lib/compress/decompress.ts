@@ -1,4 +1,7 @@
-import { tool } from "@opencode-ai/plugin"
+import type {
+    Info as V2ToolInfo,
+    ToolContext as V2ToolContext,
+} from "@opencode/plugin/promise/tool"
 import { type ToolContext, type ToolFactoryContext, resolveToolContext } from "./types"
 import type { CompressionTarget } from "../commands/compression-targets"
 import type { CompressionBlock } from "../state/types"
@@ -31,13 +34,6 @@ import {
 import { formatTokenCount } from "../ui/utils"
 
 interface RunContext {
-    ask(input: {
-        permission: string
-        patterns: string[]
-        always: string[]
-        metadata: Record<string, unknown>
-    }): Promise<void>
-    metadata(input: { title: string }): void
     sessionID: string
 }
 
@@ -45,14 +41,7 @@ async function prepareDecompressSession(
     ctx: ToolContext,
     toolCtx: RunContext,
 ): Promise<{ rawMessages: WithParts[] }> {
-    await toolCtx.ask({
-        permission: "compress",
-        patterns: ["*"],
-        always: ["*"],
-        metadata: {},
-    })
-
-    toolCtx.metadata({ title: "Decompress" })
+    await ctx.assertPermission(toolCtx.sessionID)
 
     const rawMessages = await fetchSessionMessages(ctx.client, toolCtx.sessionID)
 
@@ -74,9 +63,7 @@ async function finalizeDecompressSession(ctx: ToolContext): Promise<void> {
     await saveSessionState(ctx.state, ctx.logger)
 }
 
-type ResolveResult =
-    | { ok: true; targets: CompressionTarget[] }
-    | { ok: false; error: string }
+type ResolveResult = { ok: true; targets: CompressionTarget[] } | { ok: false; error: string }
 
 function resolveTargets(
     args: Record<string, unknown>,
@@ -95,7 +82,13 @@ function resolveTargets(
         return resolveSingleBlockTarget(messagesState, args.blockId as string)
     }
 
-    return resolveRangeTarget(state, rawMessages, args.startId as string, args.endId as string, logger)
+    return resolveRangeTarget(
+        state,
+        rawMessages,
+        args.startId as string,
+        args.endId as string,
+        logger,
+    )
 }
 
 function resolveSingleBlockTarget(
@@ -231,26 +224,35 @@ IMPORTANT:
 
 function buildSchema() {
     return {
-        blockId: tool.schema
-            .string()
-            .optional()
-            .describe('Block reference to decompress (e.g., "b0", "b2"). Mutually exclusive with startId/endId.'),
-        startId: tool.schema
-            .string()
-            .optional()
-            .describe('Range start: message ref (e.g., "m00150") or block ref (e.g., "b2"). Used with endId.'),
-        endId: tool.schema
-            .string()
-            .optional()
-            .describe('Range end: message ref (e.g., "m00200") or block ref (e.g., "b5"). Used with startId.'),
-        toFile: tool.schema
-            .string()
-            .optional()
-            .describe("If provided, writes restored content to this file path instead of inflating context. Block stays compressed. Path must be under /tmp or ~/.cache/opencode/. Example: '/tmp/block52.txt'"),
-        full: tool.schema
-            .boolean()
-            .optional()
-            .describe("If true, restores ALL content down to original messages (multi-level decompress). Default: false — restores one tier up (e.g., decompressing a T2 block restores T1 summaries, not raw messages). Use full:true only when you need the exact original content and have context budget for it."),
+        type: "object",
+        properties: {
+            blockId: {
+                type: "string",
+                description:
+                    'Block reference to decompress (e.g., "b0", "b2"). Mutually exclusive with startId/endId.',
+            },
+            startId: {
+                type: "string",
+                description:
+                    'Range start: message ref (e.g., "m00150") or block ref (e.g., "b2"). Used with endId.',
+            },
+            endId: {
+                type: "string",
+                description:
+                    'Range end: message ref (e.g., "m00200") or block ref (e.g., "b5"). Used with startId.',
+            },
+            toFile: {
+                type: "string",
+                description:
+                    "If provided, writes restored content to this file path instead of inflating context. Block stays compressed. Path must be under /tmp or ~/.cache/opencode/.",
+            },
+            full: {
+                type: "boolean",
+                description:
+                    "If true, restores ALL content down to original messages (multi-level decompress). Default: false.",
+            },
+        },
+        additionalProperties: false,
     }
 }
 
@@ -291,11 +293,19 @@ function extractMessageText(m: WithParts): string {
     return `[${role}]\n${segments.join("\n\n")}`
 }
 
-export function createDecompressTool(factoryCtx: ToolFactoryContext): ReturnType<typeof tool> {
-    return tool({
+export function createDecompressTool(factoryCtx: ToolFactoryContext): V2ToolInfo {
+    return {
+        name: "acp_decompress",
         description: TOOL_DESCRIPTION,
-        args: buildSchema(),
-        async execute(args, toolCtx) {
+        input: buildSchema(),
+        async execute(input, toolCtx: V2ToolContext) {
+            const args = input as {
+                blockId?: string
+                startId?: string
+                endId?: string
+                toFile?: string
+                full?: boolean
+            }
             const ctx = resolveToolContext(factoryCtx, toolCtx.sessionID)
             const { rawMessages } = await prepareDecompressSession(ctx, toolCtx)
 
@@ -307,9 +317,14 @@ export function createDecompressTool(factoryCtx: ToolFactoryContext): ReturnType
                   )
                 : undefined
 
-            const resolved = resolveTargets(args as Record<string, unknown>, ctx.state, rawMessages, ctx.logger)
+            const resolved = resolveTargets(
+                args as Record<string, unknown>,
+                ctx.state,
+                rawMessages,
+                ctx.logger,
+            )
             if (!resolved.ok) {
-                return resolved.error
+                return { content: resolved.error }
             }
             const targets = resolved.targets
 
@@ -337,7 +352,9 @@ export function createDecompressTool(factoryCtx: ToolFactoryContext): ReturnType
                     return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel))
                 })
                 if (!isAllowed) {
-                    return `Error: toFile path must be under ${os.tmpdir()} or ~/.cache/opencode/. Got: ${targetPath}`
+                    return {
+                        content: `Error: toFile path must be under ${os.tmpdir()} or ~/.cache/opencode/. Got: ${targetPath}`,
+                    }
                 }
 
                 const msgIdSet = new Set<string>()
@@ -364,7 +381,9 @@ export function createDecompressTool(factoryCtx: ToolFactoryContext): ReturnType
                 await writeFile(targetPath, fileContent, "utf-8")
 
                 const displayIds = targets.map((t) => `b${t.displayId}`).join(", ")
-                return `Block(s) ${displayIds} content (${sourceNote}, ${fileContent.length} chars) written to ${targetPath}. Block(s) stay compressed — context unchanged. Use read tool to access specific parts.`
+                return {
+                    content: `Block(s) ${displayIds} content (${sourceNote}, ${fileContent.length} chars) written to ${targetPath}. Block(s) stay compressed — context unchanged. Use read tool to access specific parts.`,
+                }
             }
 
             // [Issue #446] Fail closed when host history no longer contains the
@@ -393,14 +412,15 @@ export function createDecompressTool(factoryCtx: ToolFactoryContext): ReturnType
                     missingCount: availability.missingMessageIds.length,
                     missingRefs,
                 })
-                return (
-                    `Error: Cannot decompress ${displayIds}: ${availability.missingMessageIds.length} of ` +
-                    `${availability.requiredMessageIds.length} source message(s) are no longer present in session ` +
-                    `history (removed by native compaction or external deletion). Missing: ${shownRefs}` +
-                    (extraCount > 0 ? ` (+${extraCount} more)` : "") +
-                    `. Block(s) stay compressed — the summary remains available and nothing was changed. ` +
-                    `This is a missing-source condition, not a transient fetch failure.`
-                )
+                return {
+                    content:
+                        `Error: Cannot decompress ${displayIds}: ${availability.missingMessageIds.length} of ` +
+                        `${availability.requiredMessageIds.length} source message(s) are no longer present in session ` +
+                        `history (removed by native compaction or external deletion). Missing: ${shownRefs}` +
+                        (extraCount > 0 ? ` (+${extraCount} more)` : "") +
+                        `. Block(s) stay compressed — the summary remains available and nothing was changed. ` +
+                        `This is a missing-source condition, not a transient fetch failure.`,
+                }
             }
 
             const activeMessagesBefore = snapshotActiveMessages(messagesState)
@@ -472,7 +492,7 @@ export function createDecompressTool(factoryCtx: ToolFactoryContext): ReturnType
                 reactivatedBlockIds,
             })
 
-            return lines.join("\n")
+            return { content: lines.join("\n") }
         },
-    })
+    }
 }

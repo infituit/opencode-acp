@@ -1,5 +1,5 @@
 import { SessionState, WithParts } from "./state"
-import { AssistantMessage, UserMessage } from "@opencode-ai/sdk/v2"
+import type { AssistantMessage, UserMessage } from "./state/message-types"
 import { Logger } from "./logger"
 import * as _anthropicTokenizer from "@anthropic-ai/tokenizer"
 const anthropicCountTokens = (_anthropicTokenizer.countTokens ??

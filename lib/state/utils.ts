@@ -74,8 +74,8 @@ export async function getSessionParentId(
     sessionID: string,
 ): Promise<string | undefined> {
     try {
-        const result = await client.session.get({ path: { id: sessionID } })
-        return typeof result.data?.parentID === "string" ? result.data.parentID : undefined
+        const result = await client.session.get({ sessionID })
+        return typeof result?.parentID === "string" ? result.parentID : undefined
     } catch (error: any) {
         return undefined
     }

@@ -76,7 +76,10 @@ export function truncateLargeToolOutputs(
     // when provider usage already includes the system prompt. Users with
     // larger max_tokens can lower gc.majorGcThresholdPercent — the min()
     // keeps the stricter bound.
-    const configuredThreshold = parseGcThreshold(config.gc?.majorGcThresholdPercent, effective.limit)
+    const configuredThreshold = parseGcThreshold(
+        config.gc?.majorGcThresholdPercent,
+        effective.limit,
+    )
     const overhead = (state.systemPromptTokens ?? 0) + OUTPUT_RESERVE_TOKENS
     const threshold = Math.min(configuredThreshold, effective.limit - overhead)
     if (threshold <= 0) {
@@ -114,7 +117,7 @@ export function truncateLargeToolOutputs(
             // — they are the durable product of compression and, with sticky
             // truncation on, a truncated summary would be frozen forever.
             // Mirrors enforceContextBudget's exclusion.
-            if (part.tool === "compress") continue
+            if (part.tool === "acp_compress") continue
 
             const content = extractCompletedToolOutput(part)
             if (content === undefined) continue
@@ -144,9 +147,7 @@ export function truncateLargeToolOutputs(
         const prefix = content.slice(0, KEEP_PREFIX_CHARS)
         const suffix = content.slice(-KEEP_SUFFIX_CHARS)
         const truncated =
-            prefix +
-            `\n\n...${TRUNCATION_MARKER} — original ~${tokens} tokens]...\n\n` +
-            suffix
+            prefix + `\n\n...${TRUNCATION_MARKER} — original ~${tokens} tokens]...\n\n` + suffix
 
         part.state.output = truncated
         savedTokens += tokens - countTokens(truncated)

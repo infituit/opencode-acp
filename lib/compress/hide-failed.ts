@@ -17,9 +17,7 @@ export function hideFailedCompressCalls(messages: WithParts[]): number {
         if (
             parts.some(
                 (p) =>
-                    p.type === "tool" &&
-                    p.tool === "compress" &&
-                    p.state?.status === "error",
+                    p.type === "tool" && p.tool === "acp_compress" && p.state?.status === "error",
             )
         ) {
             mostRecentFailedId = msg.info.id
@@ -38,11 +36,7 @@ export function hideFailedCompressCalls(messages: WithParts[]): number {
 
         let changed = false
         const remaining = parts.filter((p) => {
-            if (
-                p.type === "tool" &&
-                p.tool === "compress" &&
-                p.state?.status === "error"
-            ) {
+            if (p.type === "tool" && p.tool === "acp_compress" && p.state?.status === "error") {
                 hidden++
                 changed = true
                 return false

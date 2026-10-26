@@ -1,4 +1,7 @@
-import { tool } from "@opencode-ai/plugin"
+import type {
+    Info as V2ToolInfo,
+    ToolContext as V2ToolContext,
+} from "@opencode/plugin/promise/tool"
 import type { CompressionBlock } from "../state/types"
 import { type ToolFactoryContext, resolveToolContext } from "./types"
 
@@ -14,38 +17,55 @@ Call this tool to re-fetch a specific block's summary without decompressing the 
 Args:
 - blockId: optional block number (e.g., 5). If omitted, lists all active blocks with brief info.`
 
-export function createAcpContextRecapTool(factoryCtx: ToolFactoryContext): ReturnType<typeof tool> {
-    return tool({
+export function createAcpContextRecapToolV2(factoryCtx: ToolFactoryContext): V2ToolInfo {
+    factoryCtx.prompts.reload()
+
+    return {
+        name: "acp_context_recap",
         description: RECAP_TOOL_DESCRIPTION,
-        args: {
-            blockId: tool.schema
-                .number()
-                .optional()
-                .describe("Block number to retrieve (e.g., 5). If omitted, lists all active blocks."),
+        input: {
+            type: "object",
+            properties: {
+                blockId: {
+                    type: "number",
+                    description:
+                        "Block number to retrieve (e.g., 5). If omitted, lists all active blocks.",
+                },
+            },
+            additionalProperties: false,
         },
-        async execute(args, toolCtx) {
+        async execute(input, toolCtx: V2ToolContext) {
             const ctx = resolveToolContext(factoryCtx, toolCtx.sessionID)
+            const blockId =
+                input && typeof input === "object" && "blockId" in input
+                    ? (input as { blockId?: number }).blockId
+                    : undefined
             const msgState = ctx.state.prune.messages
             const activeIds = Array.from(msgState.activeBlockIds).sort((a, b) => a - b)
 
             if (activeIds.length === 0) {
-                return "No active compression blocks."
+                return { content: "No active compression blocks." }
             }
 
-            if (args.blockId !== undefined) {
-                const block = msgState.blocksById.get(args.blockId)
+            if (blockId !== undefined) {
+                const block = msgState.blocksById.get(blockId)
                 if (!block) {
-                    return `Block b${args.blockId} not found. Active blocks: ${activeIds.map((id) => `b${id}`).join(", ")}`
+                    return {
+                        content: `Block b${blockId} not found. Active blocks: ${activeIds.map((id) => `b${id}`).join(", ")}`,
+                    }
                 }
                 if (!block.active) {
-                    return `Block b${args.blockId} is inactive (deactivated by GC or nested compression).`
+                    return {
+                        content: `Block b${blockId} is inactive (deactivated by GC or nested compression).`,
+                    }
                 }
                 const range = formatCoverage(block)
-                return `[Compressed conversation section]\n${block.summary}\n\n[Block b${args.blockId} | ${range} | topic: "${block.topic || "(none)"}"]`
+                return {
+                    content: `[Compressed conversation section]\n${block.summary}\n\n[Block b${blockId} | ${range} | topic: "${block.topic || "(none)"}"]`,
+                }
             }
 
-            const lines: string[] = []
-            lines.push(`Active compression blocks (${activeIds.length}):`)
+            const lines: string[] = [`Active compression blocks (${activeIds.length}):`]
             for (const id of activeIds) {
                 const block = msgState.blocksById.get(id)
                 if (!block || !block.active) continue
@@ -54,8 +74,10 @@ export function createAcpContextRecapTool(factoryCtx: ToolFactoryContext): Retur
                 lines.push(`\nb${id} | ${range} | "${block.topic || "(none)"}"`)
                 lines.push(`  ${summaryPreview}${block.summary.length > 200 ? "..." : ""}`)
             }
-            lines.push(`\nCall with blockId to get the full summary: acp_context_recap({ blockId: N })`)
-            return lines.join("\n")
+            lines.push(
+                `\nCall with blockId to get the full summary: acp_context_recap({ blockId: N })`,
+            )
+            return { content: lines.join("\n") }
         },
-    })
+    }
 }

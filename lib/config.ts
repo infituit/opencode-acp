@@ -2,7 +2,6 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from "fs
 import { join, dirname } from "path"
 import { homedir } from "os"
 import { parse } from "jsonc-parser/lib/esm/main.js"
-import type { PluginInput } from "@opencode-ai/plugin"
 import {
     VALID_CONFIG_KEYS,
     getInvalidConfigKeys,
@@ -12,6 +11,11 @@ import {
 import type { LogLevel } from "./logger"
 
 type Permission = "ask" | "allow" | "deny"
+
+export interface ConfigHostContext {
+    directory: string
+    notify?: (title: string, message: string) => Promise<void>
+}
 
 /**
  * The subset of `CompressConfig` fields that can be overridden per provider /
@@ -287,7 +291,7 @@ const DEFAULT_PROTECTED_TOOLS = [
     "skill",
     "todowrite",
     "todoread",
-    "compress",
+    "acp_compress",
     "decompress",
     "batch",
     "plan_enter",
@@ -296,16 +300,16 @@ const DEFAULT_PROTECTED_TOOLS = [
     "edit",
 ]
 
-const COMPRESS_DEFAULT_PROTECTED_TOOLS = ["skill", "compress"]
+const COMPRESS_DEFAULT_PROTECTED_TOOLS = ["skill", "acp_compress"]
 
 /**
  * Tools that are ALWAYS protected from compression, regardless of user config.
- * "compress" must never be compressed away — its `summary` parameter is the
+ * "acp_compress" must never be compressed away — its `summary` parameter is the
  * sole record of compressed conversation. Losing it causes irreversible data
  * loss. Even if a user explicitly sets `compress.protectedTools: []`, these
  * tools are force-appended after the override.
  */
-const FORCE_COMPRESS_PROTECTED: readonly string[] = ["compress"]
+const FORCE_COMPRESS_PROTECTED: readonly string[] = ["acp_compress"]
 
 export {
     VALID_CONFIG_KEYS,
@@ -315,7 +319,7 @@ export {
 } from "./config-validation"
 
 function showConfigWarnings(
-    ctx: PluginInput,
+    ctx: ConfigHostContext,
     configPath: string,
     configData: Record<string, any>,
     isProject: boolean,
@@ -347,14 +351,7 @@ function showConfigWarnings(
 
     setTimeout(() => {
         try {
-            ctx.client.tui.showToast({
-                body: {
-                    title: `ACP: ${configType} warning`,
-                    message: `${configPath}\n${messages.join("\n")}`,
-                    variant: "warning",
-                    duration: 7000,
-                },
-            })
+            void ctx.notify?.(`ACP: ${configType} warning`, `${configPath}\n${messages.join("\n")}`)
         } catch {}
     }, 7000)
 }
@@ -468,7 +465,7 @@ function findOpencodeDir(startDir: string): string | null {
     return null
 }
 
-function getConfigPaths(ctx?: PluginInput): {
+function getConfigPaths(ctx?: ConfigHostContext): {
     global: string | null
     configDir: string | null
     project: string | null
@@ -817,22 +814,15 @@ function mergeLayer(config: PluginConfig, data: Record<string, any>): PluginConf
     }
 }
 
-function scheduleParseWarning(ctx: PluginInput, title: string, message: string): void {
+function scheduleParseWarning(ctx: ConfigHostContext, title: string, message: string): void {
     setTimeout(() => {
         try {
-            ctx.client.tui.showToast({
-                body: {
-                    title,
-                    message,
-                    variant: "warning",
-                    duration: 7000,
-                },
-            })
+            void ctx.notify?.(title, message)
         } catch {}
     }, 7000)
 }
 
-export function getConfig(ctx: PluginInput): PluginConfig {
+export function getConfig(ctx: ConfigHostContext): PluginConfig {
     let config = deepCloneConfig(defaultConfig)
     const configPaths = getConfigPaths(ctx)
 

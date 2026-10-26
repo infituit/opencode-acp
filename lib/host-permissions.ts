@@ -70,7 +70,7 @@ const getPermissionRules = (permissionConfigs: PermissionConfig[]): PermissionRu
 
 export const compressDisabledByOpencode = (...permissionConfigs: PermissionConfig[]): boolean => {
     const match = findLastMatchingRule(getPermissionRules(permissionConfigs), (rule) =>
-        wildcardMatch("compress", rule.permission),
+        wildcardMatch("acp_compress", rule.permission),
     )
 
     return match?.pattern === "*" && match.action === "deny"
@@ -120,9 +120,9 @@ export const anyRuleResolves = (permissionConfig: PermissionConfig, tool: string
 }
 
 /**
- * Merge ACP's tool permissions into the host map. An explicit user `compress`
+ * Merge ACP's tool permissions into the host map. An explicit user `acp_compress`
  * rule means the user owns the map (returned unchanged). Otherwise write
- * `compress` + default `acp_status: "allow"` — but never override a user
+ * `acp_compress` + default `acp_status: "allow"` — but never override a user
  * decision on `acp_status`, whether an exact key ([#457]: it used to be
  * silently rewritten to `"allow"`, inverting the decision; the host reads its
  * own permissions from this same map) or a wildcard like `"*"` / `"acp*"`
@@ -134,13 +134,13 @@ export const applyAcpToolPermissions = (
     permissionConfig: PermissionConfig,
     compressPermission: PermissionAction,
 ): Record<string, PermissionValue> => {
-    if (permissionConfig && hasExplicitToolPermission(permissionConfig, "compress")) {
+    if (permissionConfig && hasExplicitToolPermission(permissionConfig, "acp_compress")) {
         return permissionConfig
     }
 
     const next: Record<string, PermissionValue> = {
         ...(permissionConfig ?? {}),
-        compress: compressPermission,
+        acp_compress: compressPermission,
     }
 
     if (!anyRuleResolves(permissionConfig, "acp_status")) {

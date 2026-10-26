@@ -61,7 +61,7 @@ function collectCompressInvocations(messages: WithParts[]): CompressInvocation[]
     for (const message of messages) {
         const parts = Array.isArray(message.parts) ? message.parts : []
         for (const part of parts) {
-            if (part.type !== "tool" || part.tool !== "compress") {
+            if (part.type !== "tool" || part.tool !== "acp_compress") {
                 continue
             }
             if (part.state?.status !== "completed") {
@@ -129,7 +129,7 @@ function fingerprintMessage(message: WithParts): string {
         if (part.type === "tool") {
             // Forks can omit historical compress inputs, which is precisely the
             // case parent-state transfer must recover from.
-            if (part.tool === "compress") {
+            if (part.tool === "acp_compress") {
                 return { type: "tool", tool: part.tool, status: part.state?.status }
             }
             return {

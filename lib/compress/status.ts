@@ -1,4 +1,7 @@
-import { tool } from "@opencode-ai/plugin"
+import type {
+    Info as V2ToolInfo,
+    ToolContext as V2ToolContext,
+} from "@opencode/plugin/promise/tool"
 import { type ToolContext, type ToolFactoryContext, resolveToolContext } from "./types"
 import { formatAge } from "../ui/utils"
 import type { CompressionBlock, WithParts } from "../state/types"
@@ -638,36 +641,44 @@ export function buildStatusReport(
     return lines.join("\n")
 }
 
-export function createAcpStatusTool(factoryCtx: ToolFactoryContext): ReturnType<typeof tool> {
+export function createAcpStatusToolV2(factoryCtx: ToolFactoryContext): V2ToolInfo {
     factoryCtx.prompts.reload()
 
-    return tool({
+    return {
+        name: "acp_status",
         description: ACP_STATUS_TOOL_DESCRIPTION,
-        args: {
-            scope: tool.schema
-                .string()
-                .optional()
-                .describe('Drill down: "compressed" or "uncompressed". No arg = overview of both.'),
-            view: tool.schema
-                .string()
-                .optional()
-                .describe(
-                    'Display format for scope:"uncompressed": "candidates" (default when compress.candidates is enabled — otherwise "ranges"), "ranges" (raw grouped ranges), or "messages" (per-message listing with sort/filter)',
-                ),
-            tool: tool.schema
-                .string()
-                .optional()
-                .describe(
-                    'Filter by tool type (only with scope:"uncompressed", view:"messages"). e.g., "bash", "todowrite", "write"',
-                ),
-            sort: tool.schema
-                .string()
-                .optional()
-                .describe('Sort order: "size" (default), "time", or "tool"'),
-            limit: tool.schema.number().optional().describe("Max items to list (default 30)"),
+        input: {
+            type: "object",
+            properties: {
+                scope: {
+                    type: "string",
+                    description:
+                        'Drill down: "compressed" or "uncompressed". No arg = overview of both.',
+                },
+                view: {
+                    type: "string",
+                    description:
+                        'Display format for scope:"uncompressed": "candidates", "ranges", or "messages".',
+                },
+                tool: {
+                    type: "string",
+                    description:
+                        'Filter by tool type (only with scope:"uncompressed", view:"messages").',
+                },
+                sort: { type: "string", description: 'Sort order: "size", "time", or "tool".' },
+                limit: { type: "number", description: "Max items to list (default 30)." },
+            },
+            additionalProperties: false,
         },
-        async execute(args, toolCtx) {
+        async execute(input, toolCtx: V2ToolContext) {
             const ctx = resolveToolContext(factoryCtx, toolCtx.sessionID)
+            const args = input as {
+                scope?: string
+                view?: string
+                tool?: string
+                sort?: string
+                limit?: number
+            }
             const scope =
                 args.scope === "compressed" || args.scope === "uncompressed"
                     ? args.scope
@@ -685,23 +696,23 @@ export function createAcpStatusTool(factoryCtx: ToolFactoryContext): ReturnType<
                 Number.isFinite(args.limit) && args.limit! > 0 ? Math.min(args.limit!, 200) : 30
 
             if (scope === "compressed") {
-                return buildStatusReport({ state: ctx.state, config: ctx.config }, [], {
-                    scope: "compressed",
-                    sort,
-                    limit,
-                })
+                return {
+                    content: buildStatusReport({ state: ctx.state, config: ctx.config }, [], {
+                        scope: "compressed",
+                        sort,
+                        limit,
+                    }),
+                }
             }
 
             let rawMessages: WithParts[] = []
             try {
                 rawMessages = await fetchSessionMessages(ctx.client, toolCtx.sessionID)
             } catch {
-                if (scope === "uncompressed") return "(unable to fetch messages)"
-                rawMessages = []
+                if (scope === "uncompressed") return { content: "(unable to fetch messages)" }
             }
 
             hideConsumedCompressCalls(ctx.state, rawMessages)
-
             assignMessageRefs(ctx.state, rawMessages)
             if (repairNonMonotonicMessageRefs(ctx.state, rawMessages)) {
                 ctx.logger.warn("Repaired non-monotonic message aliases after native compaction", {
@@ -710,6 +721,7 @@ export function createAcpStatusTool(factoryCtx: ToolFactoryContext): ReturnType<
                 })
                 await saveSessionState(ctx.state, ctx.logger)
             }
+
             const { providerId, modelId } = getModelInfo(rawMessages)
             const effectiveCtx: typeof ctx = {
                 ...ctx,
@@ -785,13 +797,14 @@ export function createAcpStatusTool(factoryCtx: ToolFactoryContext): ReturnType<
                 if (!plan) clearSmartPlan(toolCtx.sessionID)
             }
 
-            return (
-                buildStatusReport(
-                    { state: effectiveCtx.state, config: effectiveCtx.config },
-                    rawMessages,
-                    { scope, view, tool: toolFilter, sort, limit },
-                ) + smartPlanSuffix
-            )
+            return {
+                content:
+                    buildStatusReport(
+                        { state: effectiveCtx.state, config: effectiveCtx.config },
+                        rawMessages,
+                        { scope, view, tool: toolFilter, sort, limit },
+                    ) + smartPlanSuffix,
+            }
         },
-    })
+    }
 }

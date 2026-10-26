@@ -11,6 +11,7 @@ export interface ToolContext {
     logger: Logger
     config: PluginConfig
     prompts: PromptStore
+    assertPermission: (sessionID: string) => Promise<void>
 }
 
 export interface ToolFactoryContext {
@@ -19,15 +20,13 @@ export interface ToolFactoryContext {
     logger: Logger
     config: PluginConfig
     prompts: PromptStore
+    assertPermission: (sessionID: string) => Promise<void>
 }
 
 // [FIX #33] Resolve the caller's per-session state at tool-call time and build a
 // ToolContext bound to it. A compress tool can only run after messages.transform
 // initialized the session, so the state is guaranteed present.
-export function resolveToolContext(
-    factoryCtx: ToolFactoryContext,
-    sessionID: string,
-): ToolContext {
+export function resolveToolContext(factoryCtx: ToolFactoryContext, sessionID: string): ToolContext {
     // [FIX #405] Action-time owner re-check (defense-in-depth for every ACP
     // tool — all five execute() bodies enter through here): the config hook
     // denies the tools once billion-context claims ownership, but the
@@ -53,6 +52,7 @@ export function resolveToolContext(
         logger: factoryCtx.logger,
         config: factoryCtx.config,
         prompts: factoryCtx.prompts,
+        assertPermission: factoryCtx.assertPermission,
     }
 }
 

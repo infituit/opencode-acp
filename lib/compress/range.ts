@@ -1,4 +1,7 @@
-import { tool } from "@opencode-ai/plugin"
+import type {
+    Info as V2ToolInfo,
+    ToolContext as V2ToolContext,
+} from "@opencode/plugin/promise/tool"
 import { type ToolFactoryContext, resolveToolContext } from "./types"
 import { countTokens } from "../token-utils"
 import { RANGE_FORMAT_EXTENSION } from "../prompts/extensions/tool"
@@ -51,70 +54,71 @@ export function requiresSmartPlan(
 
 function buildSchema(maxSummaryLengthHard: number) {
     return {
-        topic: tool.schema
-            .string()
-            .optional()
-            .describe(
-                "Fallback topic for entries without their own. Omit when each content entry specifies its own topic.",
-            ),
-        content: tool.schema
-            .array(
-                tool.schema.object({
-                    topic: tool.schema
-                        .string()
-                        .optional()
-                        .describe(
-                            "Short label (3-5 words) for THIS range, e.g. 'Auth System Exploration'. Omit to use top-level topic. When compressing multiple unrelated ranges, give each its own topic for better quality.",
-                        ),
-                    startId: tool.schema
-                        .string()
-                        .describe(
-                            "Message or block ID marking the beginning of range (e.g. m00001, b2)",
-                        ),
-                    endId: tool.schema
-                        .string()
-                        .describe("Message or block ID marking the end of range (e.g. m00012, b5)"),
-                    summary: tool.schema
-                        .string()
-                        .describe(
-                            "Complete technical summary replacing all content in range. Keep only essential details (conclusions, file paths, decisions, exact values, etc.).",
-                        ),
-                }),
-            )
-            .describe(
-                "One or more ranges to compress, each with start/end boundaries and a summary. When compressing multiple unrelated ranges in one call, give each its own topic.",
-            ),
-        summaryMaxChars: tool.schema
-            .number()
-            .optional()
-            .describe(
-                `Override max summary length (default max: ${maxSummaryLengthHard} chars). Use when content is important and needs more detail — don't lose critical info just to fit the limit.`,
-            ),
-        dangerous: tool.schema
-            .boolean()
-            .optional()
-            .describe(
-                "Set to true ONLY when you are certain the most recent message(s) must be compressed. Required when a range includes the tail of the conversation.",
-            ),
-        acknowledgeRisk: tool.schema.boolean().optional(),
+        type: "object",
+        properties: {
+            topic: {
+                type: "string",
+                description:
+                    "Fallback topic for entries without their own. Omit when each content entry specifies its own topic.",
+            },
+            content: {
+                type: "array",
+                description:
+                    "One or more ranges to compress, each with start/end boundaries and a summary.",
+                items: {
+                    type: "object",
+                    properties: {
+                        topic: {
+                            type: "string",
+                            description: "Short label (3-5 words) for this range.",
+                        },
+                        startId: {
+                            type: "string",
+                            description: "Message or block ID marking the beginning.",
+                        },
+                        endId: {
+                            type: "string",
+                            description: "Message or block ID marking the end.",
+                        },
+                        summary: {
+                            type: "string",
+                            description:
+                                "Complete technical summary replacing all content in range.",
+                        },
+                    },
+                    required: ["startId", "endId", "summary"],
+                    additionalProperties: false,
+                },
+            },
+            summaryMaxChars: {
+                type: "number",
+                description: `Override max summary length (default max: ${maxSummaryLengthHard} chars).`,
+            },
+            dangerous: {
+                type: "boolean",
+                description: "Set true only when the most recent messages must be compressed.",
+            },
+            acknowledgeRisk: { type: "boolean" },
+        },
+        required: ["content"],
+        additionalProperties: false,
     }
 }
 
-export function createCompressRangeTool(factoryCtx: ToolFactoryContext): ReturnType<typeof tool> {
+export function createCompressRangeTool(factoryCtx: ToolFactoryContext): V2ToolInfo {
     factoryCtx.prompts.reload()
     const runtimePrompts = factoryCtx.prompts.getRuntimePrompts()
 
-    return tool({
+    return {
+        name: "acp_compress",
         description: runtimePrompts.compressRange + RANGE_FORMAT_EXTENSION,
-        args: buildSchema(factoryCtx.config.compress.maxSummaryLengthHard),
-        async execute(args, toolCtx) {
+        input: buildSchema(factoryCtx.config.compress.maxSummaryLengthHard),
+        async execute(input, toolCtx: V2ToolContext) {
             const ctx0 = resolveToolContext(factoryCtx, toolCtx.sessionID)
-            const input = args as CompressRangeToolArgs
-            validateArgs(input)
+            const args = input as CompressRangeToolArgs
+            validateArgs(args)
 
-            const maxLen =
-                (args as { summaryMaxChars?: number }).summaryMaxChars ??
-                ctx0.config.compress.maxSummaryLengthHard
+            const maxLen = args.summaryMaxChars ?? ctx0.config.compress.maxSummaryLengthHard
             for (const entry of input.content) {
                 if (entry.summary.length > maxLen) {
                     throw new Error(
@@ -123,10 +127,7 @@ export function createCompressRangeTool(factoryCtx: ToolFactoryContext): ReturnT
                 }
             }
 
-            const callId =
-                typeof (toolCtx as unknown as { callID?: unknown }).callID === "string"
-                    ? (toolCtx as unknown as { callID: string }).callID
-                    : undefined
+            const callId = typeof toolCtx.id === "string" ? toolCtx.id : undefined
 
             const { rawMessages, searchContext } = await prepareSession(
                 ctx0,
@@ -403,9 +404,11 @@ export function createCompressRangeTool(factoryCtx: ToolFactoryContext): ReturnT
             const ackNote = ignoredAcknowledgeRisk
                 ? `\n⚠️ acknowledgeRisk was ignored: no quality gate rejection was pending, so quality checks ran normally. Only pass it when retrying immediately after a quality gate rejection.\n`
                 : ""
-            return `Compressed ${totalCompressedMessages} messages into ${COMPRESSED_BLOCK_HEADER}.${skippedNote}${ackNote}\nIMPORTANT: This was an automatic context compression. You MUST continue your previous task exactly where you left off. Do NOT ask the user what to do next.\n💡 Tip: Use search_context('keyword') to find compressed content when you need it later.`
+            return {
+                content: `Compressed ${totalCompressedMessages} messages into ${COMPRESSED_BLOCK_HEADER}.${skippedNote}${ackNote}\nIMPORTANT: This was an automatic context compression. You MUST continue your previous task exactly where you left off. Do NOT ask the user what to do next.\n💡 Tip: Use acp_search_context('keyword') to find compressed content when you need it later.`,
+            }
         },
-    })
+    }
 }
 
 function extractBoundaryConsumedBlocks(
