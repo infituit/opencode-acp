@@ -2,228 +2,93 @@ name: Release
 
 on:
     push:
-        branches: [master]
-    workflow_dispatch:
-        inputs:
-            force:
-                description: "Force publish even if not a release branch merge"
-                required: false
-                default: "false"
+        tags: ["v*"]
+
+permissions:
+    contents: read
+
+concurrency:
+    group: release-${{ github.ref }}
+    cancel-in-progress: false
 
 jobs:
-    publish:
+    release:
         runs-on: ubuntu-latest
         permissions:
             contents: write
-            pull-requests: write
         steps:
             - uses: actions/checkout@v4
               with:
-                  fetch-depth: 0
-
-            - name: Check commit type
-              id: check
-              run: |
-                  MERGE_MSG=$(git log -1 --pretty=%B)
-                  MERGE_TITLE=$(echo "$MERGE_MSG" | head -1)
-                  echo "Commit title: $MERGE_TITLE"
-
-                  FORCE="${{ github.event.inputs.force }}"
-                  IS_RELEASE="false"
-                  IS_PROMOTE_STABLE="false"
-
-                  # Pattern 1: Standard merge of release branch
-                  #   "Merge pull request #171 from ranxianglei/2026-07-21_release-v1.13.2"
-                  if echo "$MERGE_TITLE" | grep -qE 'Merge pull request #[0-9]+ from .*[0-9]{4}-[0-9]{2}-[0-9]{2}_release-v'; then
-                      IS_RELEASE="true"
-                      echo "Release branch detected (standard merge)"
-                  # Pattern 2: Squash merge of a release PR
-                  #   "release: v1.13.4 — ... (#186)"
-                  elif echo "$MERGE_TITLE" | grep -qE '^release: v[0-9]+\.[0-9]+\.[0-9]+'; then
-                      IS_RELEASE="true"
-                      echo "Release branch detected (squash merge)"
-                  # Pattern 3: Squash merge of a promote-stable PR
-                  #   "promote: stable v1.14.7 — ... (#231)"
-                  elif echo "$MERGE_TITLE" | grep -qE '^promote: stable v[0-9]+\.[0-9]+\.[0-9]+'; then
-                      IS_PROMOTE_STABLE="true"
-                      STABLE_VERSION=$(echo "$MERGE_TITLE" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
-                      echo "Promote-stable detected: version $STABLE_VERSION"
-                      echo "stable_version=$STABLE_VERSION" >> "$GITHUB_OUTPUT"
-                  # Pattern 4: Standard merge of promote-stable branch
-                  #   "Merge pull request #231 from ranxianglei/2026-07-29_promote-stable-v1.14.7"
-                  elif echo "$MERGE_TITLE" | grep -qE 'Merge pull request #[0-9]+ from .*promote-stable-v[0-9]+\.[0-9]+\.[0-9]+'; then
-                      IS_PROMOTE_STABLE="true"
-                      STABLE_VERSION=$(echo "$MERGE_TITLE" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
-                      echo "Promote-stable detected (standard merge): version $STABLE_VERSION"
-                      echo "stable_version=$STABLE_VERSION" >> "$GITHUB_OUTPUT"
-                  elif [ "$FORCE" = "true" ]; then
-                      IS_RELEASE="true"
-                      echo "Force publish requested"
-                  else
-                      echo "Not a release or promote-stable branch merge — skipping"
-                  fi
-
-                  echo "is_release=$IS_RELEASE" >> "$GITHUB_OUTPUT"
-                  echo "is_promote_stable=$IS_PROMOTE_STABLE" >> "$GITHUB_OUTPUT"
-
-            - name: Read version
-              if: steps.check.outputs.is_release == 'true'
-              id: version
-              run: |
-                  VERSION=$(node -p "require('./package.json').version")
-                  TAG="v${VERSION}"
-                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-                  echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-
-                  # Detect prerelease versions (e.g. 1.13.0-dev.1, 1.13.0-beta.2)
-                  if echo "$VERSION" | grep -q -- '-'; then
-                      echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
-                      echo "npm_tag=dev" >> "$GITHUB_OUTPUT"
-                      echo "Prerelease detected: $VERSION → npm tag: dev"
-                  else
-                      echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
-                      echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
-                      echo "Stable release: $VERSION → npm tag: latest"
-                  fi
+                  persist-credentials: false
 
             - uses: actions/setup-node@v4
-              if: steps.check.outputs.is_release == 'true' || steps.check.outputs.is_promote_stable == 'true'
               with:
                   node-version: 22
                   cache: npm
-                  registry-url: https://registry.npmjs.org
 
-            # ── Promote to npm stable tag ──────────────────────────
-            # Branch naming: YYYY-MM-DD_promote-stable-v{VERSION}
-            # Commit message: "promote: stable v{VERSION} — reason"
-            # CI runs `npm dist-tag add opencode-acp@VERSION stable`
-            - name: Promote to npm stable tag
-              if: steps.check.outputs.is_promote_stable == 'true'
-              run: |
-                  VERSION="${{ steps.check.outputs.stable_version }}"
-                  echo "Promoting opencode-acp@$VERSION to 'stable' tag"
-                  npm dist-tag add "opencode-acp@$VERSION" stable
-                  echo "✓ Done. Users can now install via opencode-acp@stable"
+            - name: Check version and prepare release notes
               env:
-                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-            # ── Normal release flow (unchanged) ────────────────────
-            - if: steps.check.outputs.is_release == 'true'
-              run: npm ci
-
-            - if: steps.check.outputs.is_release == 'true'
-              run: npm run check:package
-
-            - name: Create tag
-              if: steps.check.outputs.is_release == 'true'
+                  TAG: ${{ github.ref_name }}
+              shell: bash
               run: |
-                  TAG="${{ steps.version.outputs.tag }}"
-                  if git rev-parse "$TAG" >/dev/null 2>&1; then
-                      echo "Tag $TAG already exists — skipping"
-                  else
-                      git config user.name "github-actions[bot]"
-                      git config user.email "github-actions[bot]@users.noreply.github.com"
-                      git tag -a "$TAG" -m "release $TAG (auto-tagged on merge)"
-                      git push origin "$TAG"
-                      echo "Created tag $TAG"
+                  set -euo pipefail
+                  node --input-type=module <<'NODE'
+                  import { readFileSync, readdirSync, writeFileSync } from "node:fs"
+
+                  const pkg = JSON.parse(readFileSync("package.json", "utf8"))
+                  const lock = JSON.parse(readFileSync("package-lock.json", "utf8"))
+                  if (process.env.TAG !== `v${pkg.version}`) {
+                      throw new Error("Tag must match package.json version")
+                  }
+                  if (lock.version !== pkg.version || lock.packages[""].version !== pkg.version) {
+                      throw new Error("package-lock.json version must match package.json")
+                  }
+
+                  const notes = ["zh", "en"].map((lang) => {
+                      const dir = `support-files/changelog/${lang}`
+                      const entries = readdirSync(dir).filter((name) =>
+                          name.startsWith(`v${pkg.version}_`) && name.endsWith(".md"),
+                      )
+                      if (entries.length !== 1) {
+                          throw new Error(`Expected exactly one ${lang} changelog for v${pkg.version}`)
+                      }
+                      const text = readFileSync(`${dir}/${entries[0]}`, "utf8")
+                      if (!text.includes(`Version: v${pkg.version}`)) {
+                          throw new Error(`${lang} changelog must contain Version: v${pkg.version}`)
+                      }
+                      return text.trim()
+                  })
+                  writeFileSync(`${process.env.RUNNER_TEMP}/release-notes.md`, notes.join("\n\n---\n\n") + "\n")
+                  NODE
+
+            - run: npm ci --ignore-scripts
+            - run: npm run typecheck
+            - run: npm run check:package
+
+            - name: Pack release assets
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  mkdir -p "$RUNNER_TEMP/release-assets"
+                  npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/release-assets"
+                  cd "$RUNNER_TEMP/release-assets"
+                  sha256sum ./*.tgz > SHA256SUMS
+
+            - name: Publish GitHub Release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  GH_REPO: ${{ github.repository }}
+                  TAG: ${{ github.ref_name }}
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  args=()
+                  if [[ "$TAG" == *-* ]]; then
+                      args+=(--prerelease)
                   fi
-
-            - name: Publish to npm
-              if: steps.check.outputs.is_release == 'true'
-              run: |
-                  NPM_TAG="${{ steps.version.outputs.npm_tag }}"
-                  echo "Publishing ${{ steps.version.outputs.version }} with tag: $NPM_TAG"
-                  npm publish --tag "$NPM_TAG"
-              env:
-                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-            - name: Create GitHub Release
-              if: steps.check.outputs.is_release == 'true'
-              uses: softprops/action-gh-release@v2
-              with:
-                  tag_name: ${{ steps.version.outputs.tag }}
-                  generate_release_notes: true
-                  prerelease: ${{ steps.version.outputs.is_prerelease }}
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Report published version on PR
-              if: steps.check.outputs.is_release == 'true' && success()
-              uses: actions/github-script@v7
-              with:
-                  script: |
-                      const version = '${{ steps.version.outputs.version }}';
-                      const npmTag = '${{ steps.version.outputs.npm_tag }}';
-                      const isPrerelease = '${{ steps.version.outputs.is_prerelease }}' === 'true';
-
-                      // Find the merged PR associated with this commit
-                      const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-                          owner: context.repo.owner,
-                          repo: context.repo.repo,
-                          commit_sha: context.sha
-                      });
-
-                      const prNumber = prs.data[0]?.number;
-                      if (!prNumber) {
-                          core.info('No associated PR found — skipping comment');
-                          return;
-                      }
-
-                      const installCmd = isPrerelease
-                          ? 'opencode plugin opencode-acp@dev --global'
-                          : 'opencode plugin opencode-acp@latest --global';
-
-                      const body = [
-                          `✅ **Published \`opencode-acp@${version}\`** to npm \`${npmTag}\` tag.`,
-                          '',
-                          '```bash',
-                          installCmd,
-                          '```',
-                          '',
-                          `[npm](https://www.npmjs.com/package/opencode-acp/v/${version}) | [GitHub Release](https://github.com/${context.repo.owner}/${context.repo.repo}/releases/tag/v${version})`
-                      ].join('\n');
-
-                      await github.rest.issues.createComment({
-                          owner: context.repo.owner,
-                          repo: context.repo.repo,
-                          issue_number: prNumber,
-                          body
-                      });
-
-                      core.info(`Commented on PR #${prNumber}: published ${version} to ${npmTag}`);
-
-            - name: Report promote-stable on PR
-              if: steps.check.outputs.is_promote_stable == 'true' && success()
-              uses: actions/github-script@v7
-              with:
-                  script: |
-                      const version = '${{ steps.check.outputs.stable_version }}';
-
-                      const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-                          owner: context.repo.owner,
-                          repo: context.repo.repo,
-                          commit_sha: context.sha
-                      });
-
-                      const prNumber = prs.data[0]?.number;
-                      if (!prNumber) {
-                          core.info('No associated PR found — skipping comment');
-                          return;
-                      }
-
-                      const body = [
-                          `✅ **Promoted \`opencode-acp@${version}\`** to npm \`stable\` tag.`,
-                          '',
-                          '```bash',
-                          'opencode plugin opencode-acp@stable --global',
-                          '```'
-                      ].join('\n');
-
-                      await github.rest.issues.createComment({
-                          owner: context.repo.owner,
-                          repo: context.repo.repo,
-                          issue_number: prNumber,
-                          body
-                      });
-
-                      core.info(`Commented on PR #${prNumber}: promoted ${version} to stable`);
+                  gh release create "$TAG" \
+                      "$RUNNER_TEMP/release-assets/"*.tgz \
+                      "$RUNNER_TEMP/release-assets/SHA256SUMS" \
+                      --verify-tag --title "$TAG" \
+                      --notes-file "$RUNNER_TEMP/release-notes.md" \
+                      "${args[@]}"
