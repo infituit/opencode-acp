@@ -41,8 +41,11 @@ tests/results/
 notes/
 test-update.ts
 
-# Documentation (local development only)
-docs/
+# Documentation (local development only, except the release process)
+docs/*
+!docs/developer/
+docs/developer/*
+!docs/developer/release.md
 SCHEMA_NOTES.md
 
 repomix-output.xml
