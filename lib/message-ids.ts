@@ -3,7 +3,7 @@ import { isIgnoredUserMessage } from "./messages/query"
 
 const MESSAGE_REF_REGEX = /^m(\d{4,5})$/
 const BLOCK_REF_REGEX = /^b([1-9]\d*)$/
-const MESSAGE_ID_TAG_NAME = "dcp-message-id"
+const MESSAGE_ID_TAG_NAME = "acp-message-id"
 
 const MESSAGE_REF_WIDTH = 5
 const MESSAGE_REF_MIN_INDEX = 1
@@ -166,10 +166,10 @@ export function assignMessageRefs(state: SessionState, messages: WithParts[]): n
         if (typeof rawMessageId !== "string" || rawMessageId.length === 0) {
             continue
         }
-        // [FIX Bug 29] Skip synthetic messages created by DCP
+        // [FIX Bug 29] Skip synthetic messages created by ACP
         if (
-            rawMessageId.startsWith("msg_dcp_summary_") ||
-            rawMessageId.startsWith("msg_dcp_text_")
+            rawMessageId.startsWith("msg_acp_summary_") ||
+            rawMessageId.startsWith("msg_acp_text_")
         ) {
             continue
         }
@@ -204,8 +204,8 @@ export function repairNonMonotonicMessageRefs(state: SessionState, messages: Wit
         return (
             typeof id === "string" &&
             id.length > 0 &&
-            !id.startsWith("msg_dcp_summary_") &&
-            !id.startsWith("msg_dcp_text_")
+            !id.startsWith("msg_acp_summary_") &&
+            !id.startsWith("msg_acp_text_")
         )
     })
     let previous = 0

@@ -31,10 +31,10 @@ const showHelp = args.includes("-h") || args.includes("--help")
 
 if (showHelp) {
     console.log(`
-DCP Prompt Preview CLI
+ACP Prompt Preview CLI
 
 Usage:
-  npm run dcp -- [options]
+  npm run acp -- [options]
 
 Options:
   --list                   List available prompt keys
@@ -49,9 +49,9 @@ Prompt keys:
   context-limit-nudge, turn-nudge, iteration-nudge
 
 Examples:
-  npm run dcp -- --list
-  npm run dcp -- --show compress-range
-  npm run dcp -- --system-all
+  npm run acp -- --list
+  npm run acp -- --show compress-range
+  npm run acp -- --system-all
 `)
     process.exit(0)
 }

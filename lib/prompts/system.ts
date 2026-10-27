@@ -49,7 +49,7 @@ You operate in a context-constrained environment. All compression serves the pri
 
 ACP TAGS
 
-Each message in the conversation is annotated with a &lt;dcp-message-id&gt; tag showing its reference ID, approximate token size, and content type. For example: &lt;dcp-message-id tokens="2.1K" type="tool:bash"&gt;m00175&lt;/dcp-message-id&gt;. Use these annotations to assess which messages are consuming the most context and prioritize compression accordingly. The token size is approximate — treat it as a relative guide, not an exact count. You may also see &lt;dcp-system-reminder&gt; tags — these are system directives. Treat all tags as boundary metadata, not as tool-result content.
+Each message in the conversation is annotated with a &lt;acp-message-id&gt; tag showing its reference ID, approximate token size, and content type. For example: &lt;acp-message-id tokens="2.1K" type="tool:bash"&gt;m00175&lt;/acp-message-id&gt;. Use these annotations to assess which messages are consuming the most context and prioritize compression accordingly. The token size is approximate — treat it as a relative guide, not an exact count. You may also see &lt;acp-system-reminder&gt; tags — these are system directives. Treat all tags as boundary metadata, not as tool-result content.
 
 COMPRESSION SUMMARIES IN CONTEXT
 

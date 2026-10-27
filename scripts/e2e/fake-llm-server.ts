@@ -11,7 +11,7 @@
  *   - Listens on PORT (default 8400), responds to /v1/chat/completions
  *   - Reads scenario from SCENARIO env var (JSON file path)
  *   - Tracks turns by counting user messages in each request
- *   - At compress turns: parses <dcp-message-id> tags for mNNNNN refs,
+ *   - At compress turns: parses <acp-message-id> tags for mNNNNN refs,
  *     emits compress tool_use with startId/endId/summary from scenario
  *   - After tool result: emits text acknowledgment
  *   - SSE streaming (opencode defaults to stream=true)
@@ -366,7 +366,7 @@ function handleCompressStep(
     inputTokens: number,
 ): Response {
     // Parse all mNNNNN refs from the conversation.
-    // ACP injects <dcp-message-id tokens="..." type="...">mNNNNN</dcp-message-id> tags.
+    // ACP injects <acp-message-id tokens="..." type="...">mNNNNN</acp-message-id> tags.
     const refs = parseMessageRefs(messages)
 
     if (refs.length === 0) {
@@ -655,13 +655,13 @@ function handleTaskStep(
 }
 
 /**
- * Parse <dcp-message-id ...>mNNNNN</dcp-message-id> tags from all messages.
+ * Parse <acp-message-id ...>mNNNNN</acp-message-id> tags from all messages.
  * Returns an ordered list of unique refs (m00001, m00002, ...).
  */
 function parseMessageRefs(messages: any[]): string[] {
     const refs: string[] = []
     const seen = new Set<string>()
-    const tagRegex = /<dcp-message-id[^>]*>(m\d+)<\/dcp-message-id>/g
+    const tagRegex = /<acp-message-id[^>]*>(m\d+)<\/acp-message-id>/g
 
     for (const msg of messages) {
         if (msg?.role === "system") continue
@@ -712,7 +712,7 @@ function extractMessageText(msg: any): string {
             else if (part?.content) parts.push(part.content)
         }
     }
-    // ACP injects <dcp-message-id> tags into tool_calls arguments for
+    // ACP injects <acp-message-id> tags into tool_calls arguments for
     // assistant messages that contain tool calls (no text content).
     if (Array.isArray(msg?.tool_calls)) {
         for (const tc of msg.tool_calls) {

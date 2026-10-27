@@ -1,11 +1,11 @@
-# DCP CLI
+# ACP CLI
 
 Dev tool for previewing prompt outputs.
 
 ## Usage
 
 ```bash
-bun run dcp [TYPE]
+bun run acp [TYPE]
 ```
 
 ## Types
@@ -22,9 +22,9 @@ bun run dcp [TYPE]
 ## Examples
 
 ```bash
-bun run dcp --system
-bun run dcp --nudge
-bun run dcp --context-tools
+bun run acp --system
+bun run acp --nudge
+bun run acp --context-tools
 ```
 
 ## Purpose

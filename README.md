@@ -201,7 +201,7 @@ stateDiagram-v2
 
 ## 对 Prompt 缓存的影响
 
-历史上 ACP 修复了大量由 DCP 导致的低缓存命中率问题。目前整体缓存命中率约为 **91%**。
+ACP 修复了大量低缓存命中率问题。目前整体缓存命中率约为 **91%**。
 
 ACP 保持对话前缀只追加，同时用紧凑 block 替换已压缩范围。这样可以保留服务商可复用的前缀，并将总上下文大部分时间维持在 **~10–15%**（以 1M 窗口计，p50 10 万、p90 15 万）。
 
@@ -211,7 +211,7 @@ ACP 保持对话前缀只追加，同时用紧凑 block 替换已压缩范围。
 
 ## 命令
 
-ACP 提供 `/acp` 斜杠命令（为向后兼容也接受 `/dcp`）：
+ACP 提供 `/acp` 斜杠命令：
 
 | 命令           | 说明                                                                                               |
 | -------------- | -------------------------------------------------------------------------------------------------- |
@@ -232,7 +232,7 @@ ACP 使用自己的配置文件，按以下顺序搜索：
 
 每一层覆盖前一层，因此项目设置优先于全局设置。修改配置后请重启 OpenCode。
 
-> **📖 完整参数参考：** 配置参考文档正在重写；完整字段结构见 [`dcp.schema.json`](./dcp.schema.json)。
+> **📖 完整参数参考：** 配置参考文档正在重写；完整字段结构见 [`acp.schema.json`](./acp.schema.json)。
 
 > [!IMPORTANT]
 > **禁用 OpenCode 的内置自动压缩。** ACP 自行处理上下文管理 — OpenCode 的压缩与 ACP 冲突，可能导致问题（消息重新展开、压缩状态丢失）。请在 `opencode.json` 中添加：
@@ -255,7 +255,7 @@ ACP 使用自己的配置文件，按以下顺序搜索：
 
 ```jsonc
 {
-    "$schema": "https://raw.githubusercontent.com/infituit/opencode-acp/master/dcp.schema.json",
+    "$schema": "https://raw.githubusercontent.com/infituit/opencode-acp/master/acp.schema.json",
     // Enable or disable the plugin
     "enabled": true,
     // 自动更新 npm 安装的 ACP：跟踪安装所用 dist-tag/规范（@stable 跟随 stable，@latest 跟随 latest）。
@@ -283,7 +283,7 @@ ACP 使用自己的配置文件，按以下顺序搜索：
     "allowSubAgents": true,
     // Experimental settings
     "experimental": {
-        // Enable user-editable prompt overrides under dcp-prompts directories
+        // Enable user-editable prompt overrides under acp-prompts directories
         // When false (default), prompt override files/directories are ignored
         "customPrompts": false,
     },
@@ -414,7 +414,7 @@ ACP 使用自己的配置文件，按以下顺序搜索：
     // 消息过滤器——在 ACP 处理之前，从可见上下文中剥离/去重第三方插件注入
     // （例如 oh-my-opencode 的 system reminder）。被过滤的内容不计入上下文使用量。
     // 5 个内置 OMO 过滤器默认开启（v1.14.8+）；
-    // 完整的 messageFilters 结构见 dcp.schema.json。
+    // 完整的 messageFilters 结构见 acp.schema.json。
     "messageFilters": {
         "enabled": true,
         "filters": {
@@ -455,7 +455,7 @@ ACP 使用自己的配置文件，按以下顺序搜索：
 
 不可覆盖：`permission`、已废弃的 `minContextLimit` / `modelMinLimits` 系列、以及扁平 `modelMaxLimits` / `modelMinLimits` 映射自身。注意：`modelMaxLimits` **未废弃** —— 仍完全支持，只是优先级低于嵌套的 `maxContextLimit`。
 
-完整的 `compress.providers` 字段结构见 [`dcp.schema.json`](./dcp.schema.json)。
+完整的 `compress.providers` 字段结构见 [`acp.schema.json`](./acp.schema.json)。
 
 ### Prompt 覆盖
 
@@ -487,27 +487,8 @@ ACP 暴露六个可编辑的 prompt：
 
 ---
 
-## 从 DCP 迁移
-
-在 OpenCode **>=2.1.4 且 <3** 上，可按以下步骤迁移 DCP 配置：
-
-1. 从 `opencode.json` 中移除旧的 DCP 插件
-2. 安装 ACP：`opencode plugin add github:infituit/opencode-acp#v2.0.0`
-3. 复制配置：`cp ~/.config/opencode/dcp.jsonc ~/.config/opencode/acp.jsonc`
-4. 复制 prompt 覆盖（如有）：`cp -r ~/.config/opencode/dcp-prompts ~/.config/opencode/acp-prompts`
-5. 执行 `/reload` 并新建会话。ACP 2.0 使用 OpenCode 原生插件存储；复制旧 JSON 状态文件不会迁移会话或压缩块。
-
-**变更的内容：**
-
-- 日志目录：`logs/dcp/` → `logs/acp/`
-- 斜杠命令：`/acp`
-- 通知标题：`DCP` → `ACP`
-- 上下文用量标签：`DCP threshold` → `ACP threshold`
-
----
-
 <details>
-<summary><strong>错误修复（共 39 项）</strong> — 基于 DCP v3.1.11</summary>
+<summary><strong>错误修复（共 39 项）</strong></summary>
 
 | #      | 严重程度 | 摘要                                                                                                                                    |
 | ------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -554,4 +535,4 @@ ACP 暴露六个可编辑的 prompt：
 
 ## 许可证
 
-AGPL-3.0-or-later — 本项目是 [@tarquinen/opencode-dcp](https://github.com/Tarquinen/opencode-dynamic-context-pruning) 的分支。原始版权归原始作者所有。修改和错误修复由 ranxianglei 完成。
+AGPL-3.0-or-later — 本项目源自 [Tarquinen](https://github.com/Tarquinen) 的开源项目。原始版权归原始作者所有。修改和错误修复由 ranxianglei 完成。

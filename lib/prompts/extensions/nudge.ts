@@ -102,12 +102,12 @@ export function renderMessagePriorityGuidance(priorityLabel: string, refs: strin
     ].join("\n")
 }
 
-export function appendGuidanceToDcpTag(nudgeText: string, guidance: string): string {
+export function appendGuidanceToAcpTag(nudgeText: string, guidance: string): string {
     if (!guidance.trim()) {
         return nudgeText
     }
 
-    const closeTag = "</dcp-system-reminder>"
+    const closeTag = "</acp-system-reminder>"
     const closeTagIndex = nudgeText.lastIndexOf(closeTag)
 
     if (closeTagIndex === -1) {

@@ -32,7 +32,7 @@ You specify boundaries by ID using the injected IDs visible in the conversation:
 - \`mNNNNN\` IDs identify raw messages
 - \`bN\` IDs identify previously compressed blocks
 
-Each message has an ID inside XML metadata tags like \`&lt;dcp-message-id&gt;...&lt;/dcp-message-id&gt;\`.
+Each message has an ID inside XML metadata tags like \`&lt;acp-message-id&gt;...&lt;/acp-message-id&gt;\`.
 The same ID tag appears in every tool output of the message it belongs to — each unique ID identifies one complete message.
 Treat these tags as boundary metadata only, not as tool result content.
 

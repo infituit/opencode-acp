@@ -5,11 +5,11 @@ import type { AssistantMessage, Message, UserMessage } from "../state/message-ty
 
 const SUMMARY_ID_HASH_LENGTH = 16
 
-const DCP_BLOCK_ID_TAG_REGEX = /(<(?:dcp|acp)-message-id[^>]*>)b\d+(<\/(?:dcp|acp)-message-id>)/g
+const ACP_BLOCK_ID_TAG_REGEX = /(<acp-message-id[^>]*>)b\d+(<\/acp-message-id>)/g
 // [FIX Bug 28] Regex to strip stale mNNNN refs from compressed summaries
-const DCP_MESSAGE_REF_TAG_REGEX = /<(?:dcp|acp)-message-id[^>]*>m\d+<\/(?:dcp|acp)-message-id>/g
-const DCP_PAIRED_TAG_REGEX = /<(?:dcp|acp)[^>]*>[\s\S]*?<\/(?:dcp|acp)[^>]*>/gi
-const DCP_UNPAIRED_TAG_REGEX = /<\/?(?:dcp|acp)[^>]*>/gi
+const ACP_MESSAGE_REF_TAG_REGEX = /<acp-message-id[^>]*>m\d+<\/acp-message-id>/g
+const ACP_PAIRED_TAG_REGEX = /<acp[^>]*>[\s\S]*?<\/acp[^>]*>/gi
+const ACP_UNPAIRED_TAG_REGEX = /<\/?acp[^>]*>/gi
 
 const generateStableId = (prefix: string, seed: string): string => {
     const hash = createHash("sha256").update(seed).digest("hex").slice(0, SUMMARY_ID_HASH_LENGTH)
@@ -25,8 +25,8 @@ export const createSyntheticMessage = (
     const baseInfo = baseMessage.info
     const now = Date.now()
     const deterministicSeed = stableSeed?.trim() || baseInfo.id
-    const messageId = generateStableId("msg_dcp_summary", deterministicSeed)
-    const partId = generateStableId("prt_dcp_summary", deterministicSeed)
+    const messageId = generateStableId("msg_acp_summary", deterministicSeed)
+    const partId = generateStableId("prt_acp_summary", deterministicSeed)
 
     const parts = [
         {
@@ -85,7 +85,7 @@ export const createSyntheticTextPart = (
 ) => {
     const userInfo = baseMessage.info as UserMessage
     const deterministicSeed = stableSeed?.trim() || userInfo.id
-    const partId = generateStableId("prt_dcp_text", deterministicSeed)
+    const partId = generateStableId("prt_acp_text", deterministicSeed)
 
     return {
         id: partId,
@@ -192,16 +192,16 @@ export function buildToolIdList(state: SessionState, messages: WithParts[]): str
 }
 
 export const replaceBlockIdsWithBlocked = (text: string): string => {
-    return text.replace(DCP_BLOCK_ID_TAG_REGEX, "$1BLOCKED$2")
+    return text.replace(ACP_BLOCK_ID_TAG_REGEX, "$1BLOCKED$2")
 }
 
 // [FIX Bug 28] Strip stale mNNNN refs from compressed summaries before injection
 export const stripStaleMessageRefs = (text: string): string => {
-    return text.replace(DCP_MESSAGE_REF_TAG_REGEX, "")
+    return text.replace(ACP_MESSAGE_REF_TAG_REGEX, "")
 }
 
 export const stripHallucinationsFromString = (text: string): string => {
-    return text.replace(DCP_PAIRED_TAG_REGEX, "").replace(DCP_UNPAIRED_TAG_REGEX, "")
+    return text.replace(ACP_PAIRED_TAG_REGEX, "").replace(ACP_UNPAIRED_TAG_REGEX, "")
 }
 
 // [#431] Strip a leaked bare ACP reference fragment from completed assistant text.

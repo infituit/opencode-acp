@@ -121,7 +121,7 @@ export function createSystemPromptHandler(
 
         const systemText = output.system.join("\n")
         if (INTERNAL_AGENT_SIGNATURES.some((sig) => systemText.includes(sig))) {
-            logger.info("Skipping DCP system prompt injection for internal agent")
+            logger.info("Skipping ACP system prompt injection for internal agent")
             return
         }
 
@@ -531,8 +531,6 @@ function buildHelpText(): string {
         "  /acp export       Export active compression blocks to markdown",
         "                   Options: --output <path>, --tier t1,t2,t3, --stdout, --append",
         "  /acp help         Show this help",
-        "",
-        "Also accepts /dcp for backward compatibility.",
     ].join("\n")
 }
 
@@ -552,7 +550,7 @@ export function createCommandExecuteHandler(
             return
         }
 
-        if (input.command === "acp" || input.command === "dcp") {
+        if (input.command === "acp") {
             const messages = await fetchSessionMessages(client, input.sessionID)
 
             const state = await registry.getOrCreate(client, input.sessionID, messages, config)
@@ -570,7 +568,7 @@ export function createCommandExecuteHandler(
             }
 
             // [FIX #398] Every handled /acp branch MUST abort the command by throwing
-            // __DCP_CONTEXT_HANDLED__. A normal return does NOT stop execution:
+            // __ACP_CONTEXT_HANDLED__. A normal return does NOT stop execution:
             // opencode's Plugin.trigger only aborts on hook errors, and the command is
             // registered with template: "" (no $ARGUMENTS), so opencode appends the raw
             // arguments to the empty template and sends them to the model as a user
@@ -580,22 +578,22 @@ export function createCommandExecuteHandler(
             const sub = input.arguments?.trim().toLowerCase()
             if (sub === "stats" || sub === "status" || sub === "") {
                 await handleStatsCommand(commandCtx)
-                throw new Error("__DCP_CONTEXT_HANDLED__")
+                throw new Error("__ACP_CONTEXT_HANDLED__")
             }
 
             if (sub === "export" || sub.startsWith("export ")) {
                 const exportArgs = input.arguments?.trim().slice("export".length).trim() || ""
                 await handleExportCommand(commandCtx, exportArgs)
-                throw new Error("__DCP_CONTEXT_HANDLED__")
+                throw new Error("__ACP_CONTEXT_HANDLED__")
             }
 
             if (sub === "help") {
                 await sendIgnoredMessage(client, input.sessionID, buildHelpText(), {}, logger)
-                throw new Error("__DCP_CONTEXT_HANDLED__")
+                throw new Error("__ACP_CONTEXT_HANDLED__")
             }
 
             await handleContextCommand(commandCtx)
-            throw new Error("__DCP_CONTEXT_HANDLED__")
+            throw new Error("__ACP_CONTEXT_HANDLED__")
         }
     }
 }

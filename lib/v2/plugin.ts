@@ -170,7 +170,7 @@ export const AcpV2Plugin = Plugin.define({
                         } catch (error) {
                             if (
                                 error instanceof Error &&
-                                error.message === "__DCP_CONTEXT_HANDLED__"
+                                error.message === "__ACP_CONTEXT_HANDLED__"
                             ) {
                                 return
                             }
