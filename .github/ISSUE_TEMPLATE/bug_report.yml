@@ -23,7 +23,7 @@ body:
           options:
               - label: 我已搜索现有 issues，此 Bug 尚未被报告 / I have searched existing issues and this bug has not been reported
                 required: true
-              - label: 我已阅读 [文档 / Documentation](https://github.com/infituit/opencode-acp/blob/master/README.zh-CN.md)（[English](https://github.com/infituit/opencode-acp/blob/master/README.md)）
+              - label: 我已阅读 [文档 / Documentation](https://github.com/infituit/opencode-acp/blob/master/README.md)（[English](https://github.com/infituit/opencode-acp/blob/master/README.md)）
                 required: true
               - label: 我已提供复现步骤；若无法稳定复现，已说明出现频率和触发条件 / I have provided reproduction steps, or described the frequency and conditions of an intermittent issue
                 required: true

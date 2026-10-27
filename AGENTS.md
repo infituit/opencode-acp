@@ -15,9 +15,8 @@
 |Compatibility:opencode-acp targets OpenCode 1.x V1 plugin API|OpenCode 2.x work belongs to billion-context, not this repository|verify a reported path is live V1 code before redirecting
 |Conventions:before changes inspect the owning module and at least one analogous implementation|prefer existing helpers and narrow changes|do not silently choose materially different behavior
 |Conventions:preserve exported API, persisted state, message-ref/block-ID, prompt, and configuration compatibility unless the request explicitly changes the contract
-|Conventions:TypeScript strict mode|ESM imports|format with Prettier|runtime verification uses isolated OpenCode E2E scenarios
+|Conventions:TypeScript strict mode|ESM imports|format with Prettier
 |Anti-patterns:no speculative abstractions or dependencies|no parallel compression/state/conversion paths|no hand-editing generated dist output|no unrelated refactor or formatting churn
-|Verification:behavior changes require runtime verification when practical|run typecheck/build first|use scripts/e2e for full lifecycle checks when the change crosses hooks and persistence
 |Commands:npm run typecheck|npm run build|npm run format:check|npm run check:package|./scripts/dev-deploy.sh --check|./scripts/e2e/run-e2e.sh
 |Verification:check changed paths and git diff|run the smallest relevant command set|report known failures without masking or rewriting them
 |Skills:scoped subtree AGENTS.md→.agents/skills/scoped-agentsmd/SKILL.md|project-specific reusable workflows belong under .agents/skills|generic language guidance is supplementary, not a replacement for local contracts
