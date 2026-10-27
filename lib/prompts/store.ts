@@ -98,8 +98,8 @@ export const PROMPT_KEYS: PromptKey[] = [
 
 const HTML_COMMENT_REGEX = /<!--[\s\S]*?-->/g
 const LEGACY_INLINE_COMMENT_LINE_REGEX = /^[ \t]*\/\/.*?\/\/[ \t]*$/gm
-const DCP_SYSTEM_REMINDER_TAG_REGEX =
-    /^\s*<dcp-system-reminder\b[^>]*>[\s\S]*<\/(?:dcp|acp)-system-reminder>\s*$/i
+const ACP_SYSTEM_REMINDER_TAG_REGEX =
+    /^\s*<acp-system-reminder\b[^>]*>[\s\S]*<\/acp-system-reminder>\s*$/i
 const DEFAULTS_README_FILE = "README.md"
 
 function getBundledEditablePrompts(
@@ -181,13 +181,13 @@ function stripConditionalTag(content: string, tagName: string): string {
     return content.replace(regex, "")
 }
 
-function unwrapDcpTagIfWrapped(content: string): string {
+function unwrapAcpTagIfWrapped(content: string): string {
     const trimmed = content.trim()
 
-    if (DCP_SYSTEM_REMINDER_TAG_REGEX.test(trimmed)) {
+    if (ACP_SYSTEM_REMINDER_TAG_REGEX.test(trimmed)) {
         return trimmed
-            .replace(/^\s*<dcp-system-reminder\b[^>]*>\s*/i, "")
-            .replace(/\s*<\/(?:dcp|acp)-system-reminder>\s*$/i, "")
+            .replace(/^\s*<acp-system-reminder\b[^>]*>\s*/i, "")
+            .replace(/\s*<\/acp-system-reminder>\s*$/i, "")
             .trim()
     }
 
@@ -201,14 +201,14 @@ function normalizeReminderPromptContent(content: string): string {
         return ""
     }
 
-    const startsWrapped = /^\s*<dcp-system-reminder\b[^>]*>/i.test(normalized)
-    const endsWrapped = /<\/(?:dcp|acp)-system-reminder>\s*$/i.test(normalized)
+    const startsWrapped = /^\s*<acp-system-reminder\b[^>]*>/i.test(normalized)
+    const endsWrapped = /<\/acp-system-reminder>\s*$/i.test(normalized)
 
     if (startsWrapped !== endsWrapped) {
         return ""
     }
 
-    return unwrapDcpTagIfWrapped(normalized)
+    return unwrapAcpTagIfWrapped(normalized)
 }
 
 function stripPromptComments(content: string): string {
@@ -246,7 +246,7 @@ function wrapRuntimePromptContent(definition: PromptDefinition, editableText: st
         return trimmed
     }
 
-    return `<dcp-system-reminder>\n${trimmed}\n</dcp-system-reminder>`
+    return `<acp-system-reminder>\n${trimmed}\n</acp-system-reminder>`
 }
 
 function buildDefaultPromptFileContent(bundledEditableText: string): string {

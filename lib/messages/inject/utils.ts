@@ -7,7 +7,7 @@ import {
     isFilePathProtected,
 } from "../../protected-patterns"
 import {
-    appendGuidanceToDcpTag,
+    appendGuidanceToAcpTag,
     buildCompressedBlockGuidance,
     renderMessagePriorityGuidance,
 } from "../../prompts/extensions/nudge"
@@ -516,7 +516,7 @@ function applyRangeModeAnchoredNudge(
     baseNudgeText: string,
     compressedBlockGuidance: string,
 ): void {
-    const nudgeText = appendGuidanceToDcpTag(baseNudgeText, compressedBlockGuidance)
+    const nudgeText = appendGuidanceToAcpTag(baseNudgeText, compressedBlockGuidance)
     if (!nudgeText.trim()) {
         return
     }
@@ -645,7 +645,7 @@ export function estimateContextComposition(
             .join("")
         const msgId = (msg.info as any)?.id || ""
         const isSummary =
-            msgId.startsWith("msg_dcp_summary") ||
+            msgId.startsWith("msg_acp_summary") ||
             text.includes("[Compressed conversation section]")
 
         const isProtected =

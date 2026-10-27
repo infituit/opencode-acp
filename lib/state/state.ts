@@ -463,7 +463,7 @@ export async function ensureSessionInitialized(
         }
         // [FIX Bug 29] Auto-cleanup stale synthetic message refs from persistence
         for (const [rawId, ref] of state.messageIds.byRawId) {
-            if (rawId.startsWith("msg_dcp_summary_") || rawId.startsWith("msg_dcp_text_")) {
+            if (rawId.startsWith("msg_acp_summary_") || rawId.startsWith("msg_acp_text_")) {
                 state.messageIds.byRawId.delete(rawId)
                 state.messageIds.byRef.delete(ref)
             }

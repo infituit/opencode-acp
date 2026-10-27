@@ -4,7 +4,7 @@
 |Compression Rule:Follow .agents/skills/scoped-agentsmd/references/AGENTS-compression-guide.md (pipe-index format, concise, no prose/code blocks)
 |Scope:repo-root
 |Overview:opencode-acp is a TypeScript ESM OpenCode V1 plugin for model-driven Active Context Pruning|package:opencode-acp|runtime:Node.js|package-manager:npm
-|Structure:./:{index.ts,lib,scripts,.github,package.json,tsconfig.json,tsup.config.ts,dcp.schema.json}
+|Structure:./:{index.ts,lib,scripts,.github,package.json,tsconfig.json,tsup.config.ts,acp.schema.json}
 |Where to look:plugin wiring:index.ts|hook lifecycle:lib/hooks.ts|configuration:lib/config.ts,lib/config-validation.ts|logging:lib/logger.ts
 |Where to look:compression:lib/compress|message pipeline:lib/messages|session state:lib/state|prompt rendering:lib/prompts|slash commands:lib/commands|GC:lib/gc
 |Where to look:runtime verification:scripts/e2e/run-e2e.sh and scripts/e2e/README.md|user docs:README.md,README.zh-CN.md,CONFIGURATION.md,CONFIGURATION.zh-CN.md

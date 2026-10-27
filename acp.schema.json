@@ -1,6 +1,6 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "$id": "https://raw.githubusercontent.com/infituit/opencode-acp/master/dcp.schema.json",
+    "$id": "https://raw.githubusercontent.com/infituit/opencode-acp/master/acp.schema.json",
     "title": "ACP Plugin Configuration",
     "description": "Configuration schema for the OpenCode Agent Context Pruning plugin",
     "type": "object",
@@ -13,12 +13,12 @@
         "enabled": {
             "type": "boolean",
             "default": true,
-            "description": "Enable or disable the DCP plugin"
+            "description": "Enable or disable the ACP plugin"
         },
         "autoUpdate": {
             "type": "boolean",
             "default": true,
-            "description": "Automatically update npm-installed DCP when a newer npm latest version is available. Version-locked plugin specs are not updated."
+            "description": "Automatically update npm-installed ACP when a newer npm latest version is available. Version-locked plugin specs are not updated."
         },
         "debug": {
             "type": "boolean",
@@ -49,13 +49,13 @@
         },
         "commands": {
             "type": "object",
-            "description": "Configuration for DCP slash commands (/dcp)",
+            "description": "Configuration for ACP slash commands (/acp)",
             "additionalProperties": false,
             "properties": {
                 "enabled": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Enable DCP slash commands (/dcp)"
+                    "description": "Enable ACP slash commands (/acp)"
                 },
                 "protectedTools": {
                     "type": "array",
@@ -89,7 +89,7 @@
                 "customPrompts": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Enable user-editable prompt overrides under dcp-prompts directories"
+                    "description": "Enable user-editable prompt overrides under acp-prompts directories"
                 }
             },
             "default": {
@@ -131,7 +131,7 @@
                     "description": "Opt-in emergency truncation of oversized old tool outputs near the context wall (truncateLargeToolOutputs + enforceContextBudget). Default false: per-request truncation oscillates and invalidates the provider prefix cache (#485)."
                 },
                 "maxContextLimit": {
-                    "description": "Soft upper threshold. Above this, DCP keeps sending strong compression nudges (based on nudgeFrequency), so the model is pushed to compress. Accepts number or \"X%\" of the model context window.",
+                    "description": "Soft upper threshold. Above this, ACP keeps sending strong compression nudges (based on nudgeFrequency), so the model is pushed to compress. Accepts number or \"X%\" of the model context window.",
                     "default": 100000,
                     "oneOf": [
                         {

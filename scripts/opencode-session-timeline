@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Analyze token values at each step within a single OpenCode session.
-Shows cache growth over time and highlights DCP tool usage that causes cache drops.
+Shows cache growth over time and highlights ACP tool usage that causes cache drops.
 
 Queries the OpenCode SQLite database directly for fast, offline access.
 
@@ -15,15 +15,12 @@ from typing import Optional
 from opencode_api import APIError, add_api_arguments, create_client_from_args, list_sessions_across_projects
 
 
-DCP_TOOLS = {
-    "compress",
-    "prune",
-    "distill",
-    "discard",
-    "extract",
-    "context_pruning",
-    "squash",
-    "consolidate",
+ACP_TOOLS = {
+    "acp_compress",
+    "acp_decompress",
+    "acp_search_context",
+    "acp_status",
+    "acp_context_recap",
 }
 
 
@@ -61,7 +58,7 @@ def format_duration(ms: Optional[int]) -> str:
 def extract_step_data(parts: list[dict]) -> Optional[dict]:
     step_finish = None
     tools_used = []
-    dcp_tools_used = []
+    acp_tools_used = []
 
     for part in parts:
         if part.get("type") == "step-finish" and "tokens" in part:
@@ -69,8 +66,8 @@ def extract_step_data(parts: list[dict]) -> Optional[dict]:
         elif part.get("type") == "tool":
             tool_name = part.get("tool", "")
             tools_used.append(tool_name)
-            if tool_name in DCP_TOOLS:
-                dcp_tools_used.append(tool_name)
+            if tool_name in ACP_TOOLS:
+                acp_tools_used.append(tool_name)
 
     if step_finish is None:
         return None
@@ -86,8 +83,8 @@ def extract_step_data(parts: list[dict]) -> Optional[dict]:
         "cost": step_finish.get("cost", 0),
         "reason": step_finish.get("reason", "unknown"),
         "tools_used": tools_used,
-        "dcp_tools_used": dcp_tools_used,
-        "has_dcp": len(dcp_tools_used) > 0,
+        "acp_tools_used": acp_tools_used,
+        "has_acp": len(acp_tools_used) > 0,
     }
 
 
@@ -139,7 +136,7 @@ def analyze_session(client, session: dict) -> dict:
     total_cache_read = sum(s["cache_read"] for s in steps)
     total_cost = sum(s["cost"] for s in steps)
     total_duration_ms = sum((s["duration_ms"] or 0) for s in steps)
-    total_dcp_tools = sum(len(s["dcp_tools_used"]) for s in steps)
+    total_acp_tools = sum(len(s["acp_tools_used"]) for s in steps)
     
     total_context = total_input + total_cache_read
     avg_cache_hit_rate = (total_cache_read / total_context * 100) if total_context > 0 else 0
@@ -154,7 +151,7 @@ def analyze_session(client, session: dict) -> dict:
         "total_cache_read": total_cache_read,
         "total_cost": total_cost,
         "total_duration_ms": total_duration_ms,
-        "total_dcp_tools": total_dcp_tools,
+        "total_acp_tools": total_acp_tools,
         "avg_cache_hit_rate": avg_cache_hit_rate,
     }
 
@@ -173,7 +170,7 @@ def print_timeline(result: dict, colors: Colors):
         return
 
     print(
-        f"{c.BOLD}{'Step':<6} {'Cache Read':>12} {'Δ Cache':>12} {'Input':>10} {'Output':>10} {'Cache %':>9} {'Duration':>10} {'Gap':>10} {'DCP Tools':<15} {'Reason':<12}{c.RESET}"
+        f"{c.BOLD}{'Step':<6} {'Cache Read':>12} {'Δ Cache':>12} {'Input':>10} {'Output':>10} {'Cache %':>9} {'Duration':>10} {'Gap':>10} {'ACP Tools':<15} {'Reason':<12}{c.RESET}"
     )
     print("-" * 130)
 
@@ -194,12 +191,12 @@ def print_timeline(result: dict, colors: Colors):
         else:
             pct_str = f"{c.RED}{pct:>8.1f}%{c.RESET}"
 
-        dcp_str = f"{c.YELLOW}{', '.join(step['dcp_tools_used'])}{c.RESET}" if step["has_dcp"] else f"{c.DIM}-{c.RESET}"
-        row_prefix = f"{c.YELLOW}{c.BOLD}" if step["has_dcp"] else ""
-        row_suffix = c.RESET if step["has_dcp"] else ""
+        acp_str = f"{c.YELLOW}{', '.join(step['acp_tools_used'])}{c.RESET}" if step["has_acp"] else f"{c.DIM}-{c.RESET}"
+        row_prefix = f"{c.YELLOW}{c.BOLD}" if step["has_acp"] else ""
+        row_suffix = c.RESET if step["has_acp"] else ""
 
         print(
-            f"{row_prefix}{idx:<6}{row_suffix} {step['cache_read']:>12,} {delta} {step['input']:>10,} {step['output']:>10,} {pct_str} {format_duration(step.get('duration_ms')):>10} {format_duration(step.get('time_since_prev_ms')):>10} {dcp_str:<15} {step['reason']:<12}"
+            f"{row_prefix}{idx:<6}{row_suffix} {step['cache_read']:>12,} {delta} {step['input']:>10,} {step['output']:>10,} {pct_str} {format_duration(step.get('duration_ms')):>10} {format_duration(step.get('time_since_prev_ms')):>10} {acp_str:<15} {step['reason']:<12}"
         )
 
     print("-" * 130)
@@ -220,7 +217,7 @@ def print_timeline(result: dict, colors: Colors):
     print(f"  Avg Cache Hit Rate:  {avg_pct_str}")
     print(f"  Total Cost:          ${result.get('total_cost', 0):.4f}")
     print(f"  Total Duration:      {format_duration(result.get('total_duration_ms', 0))}")
-    print(f"  Total DCP Uses:      {result.get('total_dcp_tools', 0)}")
+    print(f"  Total ACP Uses:      {result.get('total_acp_tools', 0)}")
 
 
 def main():

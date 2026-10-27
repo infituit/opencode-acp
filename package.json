@@ -3,7 +3,7 @@
     "name": "opencode-acp",
     "version": "2.0.0",
     "type": "module",
-    "description": "Active Context Pruning — model-driven context management for OpenCode (hardened fork of DCP with 35 bug fixes)",
+    "description": "Active Context Pruning — model-driven context management for OpenCode",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "exports": {
@@ -27,7 +27,7 @@
         "typecheck": "tsc --noEmit",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
-        "dcp": "tsx scripts/print.ts"
+        "acp": "tsx scripts/print.ts"
     },
     "keywords": [
         "opencode",

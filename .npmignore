@@ -22,7 +22,7 @@ dist/logs/
 # Config
 tsconfig.json
 tsup.config.ts
-dcp.schema.json
+acp.schema.json
 .prettierrc
 .prettierignore
 watch-logs.sh

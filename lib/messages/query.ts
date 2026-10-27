@@ -6,8 +6,8 @@ export function isSyntheticMessage(message: WithParts): boolean {
     const id = message?.info?.id
     return (
         typeof id === "string" &&
-        (id.startsWith("msg_dcp_summary_") ||
-            id.startsWith("msg_dcp_text_") ||
+        (id.startsWith("msg_acp_summary_") ||
+            id.startsWith("msg_acp_text_") ||
             id.startsWith("msg_acp_recap_"))
     )
 }

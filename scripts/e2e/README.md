@@ -49,7 +49,7 @@ database, or ACP state. The isolated home is wiped and recreated each run.
 - Responds to OpenAI `/v1/chat/completions` with SSE streaming
 - Reads a JSON scenario file defining turn-by-turn responses
 - Emits either text responses or `compress` tool_use calls
-- Parses `<dcp-message-id>` tags from conversation to find compressible message refs
+- Parses `<acp-message-id>` tags from conversation to find compressible message refs
 - Tracks turns via a file-based counter (persists across `opencode run` invocations)
 
 ### Turn Tracking

@@ -47,7 +47,7 @@ function extractSummaryBody(summary: string): string {
     if (body.startsWith(headerPrefix)) {
         body = body.slice(headerPrefix.length)
     }
-    body = body.replace(/\n]*>b\d+<\/dcp-message-id>$/, "")
+    body = body.replace(/\n]*>b\d+<\/acp-message-id>$/, "")
     return body.trim()
 }
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Analyze Dynamic Context Pruning (DCP) tool impact on cache efficiency.
-Tracks cache hit rates and context size changes before/after DCP tool invocations.
+Analyze Active Context Pruning (ACP) tool impact on cache efficiency.
+Tracks cache hit rates and context size changes before/after ACP tool invocations.
 
-Usage: opencode-dcp-stats [--sessions N] [--min-messages M] [--json] [--verbose]
+Usage: opencode-acp-stats [--sessions N] [--min-messages M] [--json] [--verbose]
 """
 
 import json
@@ -14,10 +14,10 @@ from typing import Optional
 
 from opencode_api import APIError, add_api_arguments, create_client_from_args, list_sessions_across_projects
 
-# DCP tool names across versions (compress is canonical; others are legacy aliases)
-DCP_TOOLS = {
-    "compress", "prune", "distill",
-    "discard", "extract", "context_pruning", "squash", "consolidate"
+# Current ACP tool names registered by the plugin.
+ACP_TOOLS = {
+    "acp_compress", "acp_decompress", "acp_search_context",
+    "acp_status", "acp_context_recap"
 }
 
 # Anthropic pricing: cache read is ~10% of input cost
@@ -32,9 +32,9 @@ def get_session_messages(client, session: dict) -> list[dict]:
 
 def is_ignored_message(message: dict, parts: list[dict]) -> bool:
     """
-    Check if a message should be ignored (DCP notification messages).
+    Check if a message should be ignored (ACP notification messages).
     Returns True if message has no parts OR all parts have ignored=true.
-    Mirrors the isIgnoredUserMessage logic from the DCP plugin.
+    Mirrors the isIgnoredUserMessage logic from the ACP plugin.
     """
     if not parts:
         return True
@@ -76,19 +76,19 @@ def extract_step_finish(parts: list[dict]) -> Optional[dict]:
     return None
 
 
-def extract_dcp_tools(parts: list[dict]) -> list[dict]:
-    """Extract all DCP tool calls from message parts."""
-    dcp_calls = []
+def extract_acp_tools(parts: list[dict]) -> list[dict]:
+    """Extract all ACP tool calls from message parts."""
+    acp_calls = []
     for part in parts:
         if part.get("type") == "tool":
             tool_name = part.get("tool", "")
-            if tool_name in DCP_TOOLS:
-                dcp_calls.append({
+            if tool_name in ACP_TOOLS:
+                acp_calls.append({
                     "tool": tool_name,
                     "state": part.get("state", {}),
                     "part_id": part.get("_id", "")
                 })
-    return dcp_calls
+    return acp_calls
 
 
 def calc_cache_hit_rate(tokens: dict) -> float:
@@ -103,12 +103,12 @@ def calc_cache_hit_rate(tokens: dict) -> float:
 
 
 def analyze_session(messages: list[dict], session_id: str) -> dict:
-    """Analyze DCP impact for a single session."""
+    """Analyze ACP impact for a single session."""
 
     result = {
         "session_id": session_id,
-        "dcp_events": [],
-        "total_dcp_calls": 0,
+        "acp_events": [],
+        "total_acp_calls": 0,
         "total_steps": 0,
         "by_tool": defaultdict(lambda: {
             "calls": 0,
@@ -122,13 +122,13 @@ def analyze_session(messages: list[dict], session_id: str) -> dict:
             "cache_after_sum": 0,
             "events_with_data": 0
         }),
-        # Track hit rates by distance from last DCP call
+        # Track hit rates by distance from last ACP call
         "hit_rates_by_distance": defaultdict(list)
     }
     
     prev_step = None
-    prev_dcp_tools = []
-    steps_since_dcp = None  # None = no DCP yet, 0 = just had DCP, 1+ = steps after
+    prev_acp_tools = []
+    steps_since_acp = None  # None = no ACP yet, 0 = just had ACP, 1+ = steps after
 
     for i, msg in enumerate(messages):
         msg_info = msg.get("info", {})
@@ -136,20 +136,20 @@ def analyze_session(messages: list[dict], session_id: str) -> dict:
         parts = msg.get("parts", [])
 
         step_finish = extract_step_finish(parts)
-        dcp_tools = extract_dcp_tools(parts)
+        acp_tools = extract_acp_tools(parts)
 
         if step_finish:
             result["total_steps"] += 1
             tokens = step_finish.get("tokens", {})
             curr_hit_rate = calc_cache_hit_rate(tokens)
             
-            # Track hit rate by distance from last DCP call
-            if steps_since_dcp is not None:
-                result["hit_rates_by_distance"][steps_since_dcp].append(curr_hit_rate)
-                steps_since_dcp += 1
+            # Track hit rate by distance from last ACP call
+            if steps_since_acp is not None:
+                result["hit_rates_by_distance"][steps_since_acp].append(curr_hit_rate)
+                steps_since_acp += 1
             
-            # If previous step had DCP tools, measure impact
-            if prev_dcp_tools and prev_step is not None:
+            # If previous step had ACP tools, measure impact
+            if prev_acp_tools and prev_step is not None:
                 prev_tokens = prev_step.get("tokens", {})
                 
                 prev_input = prev_tokens.get("input", 0)
@@ -162,9 +162,9 @@ def analyze_session(messages: list[dict], session_id: str) -> dict:
                 curr_context = curr_input + curr_cache
                 curr_hit_rate = calc_cache_hit_rate(tokens)
                 
-                for dcp in prev_dcp_tools:
-                    tool_name = dcp["tool"]
-                    result["total_dcp_calls"] += 1
+                for acp in prev_acp_tools:
+                    tool_name = acp["tool"]
+                    result["total_acp_calls"] += 1
                     
                     event = {
                         "tool": tool_name,
@@ -180,7 +180,7 @@ def analyze_session(messages: list[dict], session_id: str) -> dict:
                         "context_delta": curr_context - prev_context,
                         "message_id": msg_id
                     }
-                    result["dcp_events"].append(event)
+                    result["acp_events"].append(event)
                     
                     # Aggregate stats
                     stats = result["by_tool"][tool_name]
@@ -196,11 +196,11 @@ def analyze_session(messages: list[dict], session_id: str) -> dict:
                     stats["events_with_data"] += 1
             
             prev_step = step_finish
-            prev_dcp_tools = dcp_tools
+            prev_acp_tools = acp_tools
             
-            # Reset distance counter if this step had DCP tools
-            if dcp_tools:
-                steps_since_dcp = 0
+            # Reset distance counter if this step had ACP tools
+            if acp_tools:
+                steps_since_acp = 0
     
     return result
 
@@ -214,7 +214,7 @@ def analyze_sessions(
     session_id: str = None,
     session_list_limit: int = 5000,
 ):
-    """Analyze DCP impact across recent sessions."""
+    """Analyze ACP impact across recent sessions."""
 
     # Get sessions to analyze
     if session_id:
@@ -226,9 +226,9 @@ def analyze_sessions(
     all_results = []
     grand_totals = {
         "sessions_analyzed": 0,
-        "sessions_with_dcp": 0,
+        "sessions_with_acp": 0,
         "sessions_skipped_short": 0,
-        "total_dcp_calls": 0,
+        "total_acp_calls": 0,
         "total_steps": 0,
         "min_messages_filter": min_messages,
         "by_tool": defaultdict(lambda: {
@@ -262,12 +262,12 @@ def analyze_sessions(
         # Session metadata from API
         result["title"] = session.get("title", "Untitled")[:50]
 
-        if result["total_dcp_calls"] > 0:
+        if result["total_acp_calls"] > 0:
             all_results.append(result)
-            grand_totals["sessions_with_dcp"] += 1
+            grand_totals["sessions_with_acp"] += 1
 
         grand_totals["sessions_analyzed"] += 1
-        grand_totals["total_dcp_calls"] += result["total_dcp_calls"]
+        grand_totals["total_acp_calls"] += result["total_acp_calls"]
         grand_totals["total_steps"] += result["total_steps"]
 
         for tool, stats in result["by_tool"].items():
@@ -293,7 +293,7 @@ def analyze_sessions(
 def print_summary(results: list, totals: dict, verbose: bool = False):
     """Print human-readable summary."""
     print("=" * 110)
-    print("DCP (Dynamic Context Pruning) Cache Impact Analysis")
+    print("ACP (Active Context Pruning) Cache Impact Analysis")
     print("=" * 110)
     print()
     
@@ -303,8 +303,8 @@ def print_summary(results: list, totals: dict, verbose: bool = False):
     print(f"  Sessions scanned:           {totals['sessions_analyzed'] + totals['sessions_skipped_short']:>10,}")
     print(f"  Sessions skipped (short):   {totals['sessions_skipped_short']:>10,}")
     print(f"  Sessions analyzed:          {totals['sessions_analyzed']:>10,}")
-    print(f"  Sessions with DCP:          {totals['sessions_with_dcp']:>10,}")
-    print(f"  Total DCP tool calls:       {totals['total_dcp_calls']:>10,}")
+    print(f"  Sessions with ACP:          {totals['sessions_with_acp']:>10,}")
+    print(f"  Total ACP tool calls:       {totals['total_acp_calls']:>10,}")
     print(f"  Total steps:                {totals['total_steps']:>10,}")
     print()
     
@@ -342,15 +342,15 @@ def print_summary(results: list, totals: dict, verbose: bool = False):
         cache_preserved = total_cache_after
         cache_lost_to_input = max(0, total_cache_before - total_cache_after)
         
-        if totals["total_dcp_calls"] > 0:
+        if totals["total_acp_calls"] > 0:
             # Average context reduction
-            avg_ctx_before = (total_input_before + total_cache_before) / totals["total_dcp_calls"]
-            avg_ctx_after = (total_input_after + total_cache_after) / totals["total_dcp_calls"]
+            avg_ctx_before = (total_input_before + total_cache_before) / totals["total_acp_calls"]
+            avg_ctx_after = (total_input_after + total_cache_after) / totals["total_acp_calls"]
             ctx_reduction = avg_ctx_before - avg_ctx_after
             
-            print(f"  Total DCP events measured:     {totals['total_dcp_calls']:>12,}")
-            print(f"  Avg context before DCP:        {avg_ctx_before:>12,.0f} tokens")
-            print(f"  Avg context after DCP:         {avg_ctx_after:>12,.0f} tokens")
+            print(f"  Total ACP events measured:     {totals['total_acp_calls']:>12,}")
+            print(f"  Avg context before ACP:        {avg_ctx_before:>12,.0f} tokens")
+            print(f"  Avg context after ACP:         {avg_ctx_after:>12,.0f} tokens")
             print(f"  Avg context change:            {ctx_reduction:>+12,.0f} tokens")
             print()
             
@@ -363,11 +363,11 @@ def print_summary(results: list, totals: dict, verbose: bool = False):
             print(f"  Hit rate change:               {overall_hit_after - overall_hit_before:>+11.1f}%")
         print()
     
-    # Cache recovery analysis - hit rates by distance from last DCP call
+    # Cache recovery analysis - hit rates by distance from last ACP call
     if totals["hit_rates_by_distance"]:
-        print("CACHE RECOVERY ANALYSIS (Hit Rate by Steps Since Last DCP Call)")
+        print("CACHE RECOVERY ANALYSIS (Hit Rate by Steps Since Last ACP Call)")
         print("-" * 80)
-        print(f"{'Steps After DCP':<18} {'Samples':>10} {'Avg Hit%':>12} {'Min':>10} {'Max':>10}")
+        print(f"{'Steps After ACP':<18} {'Samples':>10} {'Avg Hit%':>12} {'Min':>10} {'Max':>10}")
         print("-" * 80)
         
         for dist in sorted(totals["hit_rates_by_distance"].keys())[:15]:
@@ -386,7 +386,7 @@ def print_summary(results: list, totals: dict, verbose: bool = False):
         if results:
             print("PER-SESSION BREAKDOWN")
             print("-" * 110)
-            print(f"{'Session':<25} {'Title':<30} {'User Msgs':>10} {'DCP Calls':>10} {'Avg Hit% Delta':>15}")
+            print(f"{'Session':<25} {'Title':<30} {'User Msgs':>10} {'ACP Calls':>10} {'Avg Hit% Delta':>15}")
             print("-" * 110)
             
             for r in results:
@@ -394,20 +394,20 @@ def print_summary(results: list, totals: dict, verbose: bool = False):
                 title = r["title"][:29]
                 user_msgs = r.get("user_messages", 0)
                 avg_delta = 0
-                if r["dcp_events"]:
-                    avg_delta = sum(e["hit_rate_delta"] for e in r["dcp_events"]) / len(r["dcp_events"])
+                if r["acp_events"]:
+                    avg_delta = sum(e["hit_rate_delta"] for e in r["acp_events"]) / len(r["acp_events"])
                 delta_str = f"{avg_delta:+.1f}%"
-                print(f"{sid:<25} {title:<30} {user_msgs:>10,} {r['total_dcp_calls']:>10,} {delta_str:>15}")
+                print(f"{sid:<25} {title:<30} {user_msgs:>10,} {r['total_acp_calls']:>10,} {delta_str:>15}")
             print()
     
-    # Individual DCP events (only in verbose mode)
+    # Individual ACP events (only in verbose mode)
     if verbose:
-        print("INDIVIDUAL DCP EVENTS")
+        print("INDIVIDUAL ACP EVENTS")
         print("-" * 110)
         for r in results:
-            if r["dcp_events"]:
+            if r["acp_events"]:
                 print(f"\n  Session: {r['title'][:60]}")
-                for event in r["dcp_events"][:15]:
+                for event in r["acp_events"][:15]:
                     ctx_delta = f"{event['context_delta']:+,}"
                     hit_delta = f"{event['hit_rate_delta']:+.1f}%"
                     print(f"    {event['tool']:<12} hit%: {event['hit_rate_before']:>5.1f} -> {event['hit_rate_after']:>5.1f} ({hit_delta:>7})  ctx: {event['context_before']:>8,} -> {event['context_after']:>8,} ({ctx_delta:>8})")
@@ -416,7 +416,7 @@ def print_summary(results: list, totals: dict, verbose: bool = False):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Analyze DCP tool cache impact")
+    parser = argparse.ArgumentParser(description="Analyze ACP tool cache impact")
     parser.add_argument("--sessions", "-n", type=int, default=20,
                         help="Number of recent sessions to scan (default: 20)")
     parser.add_argument("--session", "-s", type=str, default=None,

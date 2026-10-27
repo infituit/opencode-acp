@@ -1,5 +1,5 @@
 /**
- * DCP Context Command
+ * ACP Context Command
  * Shows a visual breakdown of token usage in the current session.
  *
  * TOKEN CALCULATION STRATEGY
