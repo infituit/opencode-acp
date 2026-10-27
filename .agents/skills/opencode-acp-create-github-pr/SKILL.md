@@ -9,6 +9,8 @@ This is the repository-local PR delivery workflow, not a generic GitHub PR tutor
 
 This skill owns the agent execution flow and remote-write safety. It does not replace domain-specific investigation, code review, runtime verification, or release procedures.
 
+For release preparation and package/lock/changelog alignment, use `release-version-alignment` first. For bilingual release notes, use `changelog-doc`. Version naming lives in `docs/concepts/version_management.md`; maintainer steps live in `docs/developer/release.md`. These skills return here for Issue/PR delivery and do not authorize tagging or publishing.
+
 ## Operating modes
 
 Choose the mode from the user's wording before any remote write:
@@ -108,7 +110,7 @@ For this repository, use the following as a starting matrix and adjust it to the
 | `package.json` version change                                                           | `./scripts/ci/check-pr.sh <head-branch> <base-ref>`; confirm both `support-files/changelog/en` and `support-files/changelog/zh` contain the new version as required by the script |
 | Documentation-only changes                                                              | the relevant format or link checks if available; do not claim runtime checks unless the changed docs affect executable examples or contracts                                      |
 
-The repository CI currently runs `npm ci`, `npm run typecheck` on Node 22 and 24, `npm run check:package`, and a selected E2E suite on Node 22. Treat this as a map of CI expectations, not proof that local checks ran.
+The repository CI currently runs `npm ci --ignore-scripts`, `npm run typecheck`, and `npm run check:package` on Node 22, with PR convention checks against the target base. Release runs only on pushed `v*` tags, validates version naming and package/lock/changelog alignment, then builds GitHub-only release assets. It does not publish to npm or create tags. Read the current workflows before relying on this map; it is not proof that checks ran.
 
 For E2E work, the runner is isolated under `/tmp/acp-e2e`; it requires `opencode`, `bun`, `node`, and `curl`. A normal run builds first; use `SKIP_BUILD=1` only when the build was already run against the same current HEAD.
 
