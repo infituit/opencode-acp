@@ -19,7 +19,7 @@ body:
           options:
               - label: 我已搜索现有 issues，此功能尚未被提出 / I have searched existing issues and this feature has not been requested
                 required: true
-              - label: 我已阅读 [文档 / Documentation](https://github.com/infituit/opencode-acp/blob/master/README.zh-CN.md)（[English](https://github.com/infituit/opencode-acp/blob/master/README.md)）
+              - label: 我已阅读 [文档 / Documentation](https://github.com/infituit/opencode-acp/blob/master/README.md)（[English](https://github.com/infituit/opencode-acp/blob/master/README.md)）
                 required: true
 
     - type: textarea

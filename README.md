@@ -1,231 +1,192 @@
-[English](./README.md) | [中文](./README.zh-CN.md)
+[English](./README.md) | [中文](README.md)
 
 <p align="center">
-<strong>Active Context Pruning</strong> for <a href="https://opencode.ai">OpenCode</a>
+<strong>Active Context Pruning</strong> — <a href="https://opencode.ai">OpenCode</a> 的主动上下文剪枝插件
 <br />
-The model decides <em>when</em> and <em>what</em> to compress — not a hard limit.
+由模型决定<em>何时</em>压缩、压缩<em>什么</em> — 而非硬性截断。
 <br />
-<strong>200K tokens is enough.</strong>
+<strong>20 万 token 足矣。</strong>
 </p>
 
 ---
 
-## Community
+## 社区
 
-QQ Group:
-1056132097 (full)
-1108730198 (open)
-
----
-
-> ⚠️ **Using OpenCode 2.x?** This extension uses the OpenCode **V1** plugin
-> API and does **not** load on OpenCode 2.x. It remains fully supported on
-> OpenCode **1.x**.
+QQ群:
+1056132097(已满)
+1108730198(未满)
 
 ---
 
-## 📄 Paper / Preprint
+> **ACP 2.0 要求 OpenCode >=2.1.4 且 <3。** 本版本使用 V2 插件 API，不支持 OpenCode 1.x。本版本仅通过 GitHub 分发，未发布到 npm；`opencode-acp@stable` 和 `@latest` 不会安装本次发布的版本。
 
-- **[Model-Driven Incremental Hierarchical Compression: Training-Free Multi-Generational Context Management for Long-Lived Coding Agents](./paper/model-driven-incremental-hierarchical-compression-training-free-multi-generational-context-management-for-long-lived-coding-agents.md)** (English, v0.2)
+---
 
-> 📝 **The paper itself is open-sourced under the MIT License as part of the codebase (`paper/`). It is a living document — anyone may edit it; improvements are welcome via pull request.**
+## 📄 论文 / 预印本
 
-A production-scale longitudinal study: 4.5 months, three hosts, 174,327 model calls, 18.76B cumulative input tokens (~24.7B across all hosts), zero window violations on 204,800-token models, marathon sessions of 8,584–12,049 calls.
+- **[模型驱动的分层增量压缩:面向长寿命编码 Agent 的免训练多代上下文管理](./paper/模型驱动的分层增量压缩-免训练多代上下文管理.md)**(中文版,v0.2)
+
+> 📝 **论文本身与代码一同以 MIT 许可开源(位于 `paper/` 目录),是代码库的一部分 —— 这是一份活文档,任何人都可以编辑,欢迎提 PR 改进。**
+
+生产规模纵向研究:四个半月、三宿主、174,327 次模型调用、187.6 亿累计输入 token(三宿主合计约 247 亿),204,800-token 窗口零违规,马拉松会话 8,584–12,049 次调用。
 
 ---
 
 <p align="center">
-<a href="https://www.npmjs.com/package/opencode-acp"><img src="https://img.shields.io/npm/v/opencode-acp.svg?style=flat-square" alt="npm"></a>
-<a href="https://github.com/infituit/opencode-acp/blob/master/LICENSE"><img src="https://img.shields.io/npm/l/opencode-acp.svg?style=flat-square" alt="license"></a>
+<a href="https://github.com/infituit/opencode-acp/releases"><img src="https://img.shields.io/github/v/release/infituit/opencode-acp?style=flat-square" alt="GitHub release"></a>
+<a href="https://github.com/infituit/opencode-acp/blob/master/LICENSE"><img src="https://img.shields.io/github/license/infituit/opencode-acp?style=flat-square" alt="license"></a>
 <a href="https://github.com/infituit/opencode-acp"><img src="https://img.shields.io/badge/GitHub-infituit%2Fopencode--acp-181717?style=flat-square&logo=github" alt="GitHub"></a>
 </p>
 
 <p align="center">
-<code>opencode plugin opencode-acp@stable --global</code>
+<code>opencode plugin add github:infituit/opencode-acp#v2.0.0</code>
 </p>
 
 ---
 
-## Why ACP
+## 为什么选择 ACP
 
-ACP hands all context-management authority to the model itself — without
-requiring a separate model or an external context-management service. The
-implementation keeps compression, recovery, and context accounting in one
-OpenCode plugin.
+ACP 将上下文管理的所有权限交给模型自己，不需要额外模型或外部上下文管理服务。压缩、恢复和上下文统计都集中在同一个 OpenCode 插件中。
 
-This brings two concrete effects:
+这带来两个影响：
 
-- **200K tokens is enough.** Across 30,000+ API calls in 50 real engineering
-  sessions, **97% of requests stayed under 200K tokens** — p90 at 150K, p95 at
-  180K. Every API call re-bills the full context, so keeping context low directly
-  reduces cost — even with a 90%+ prompt-cache hit rate, the non-cached portion
-  is billed at full price.
-- **It supports ultra-long sessions without losing key content** — observed at
-  **3,300+ messages and 300M+ cumulative tokens** per session; architecturally
-  supports up to **100,000 messages** (5-digit message-ID space).
+- **20 万 token 足矣。** 在 50 个真实工程会话、3 万余次 API 调用中，**97% 的请求低于 20 万 token** —— p90 约 15 万，p95 约 18 万。每次 API 调用都会对完整上下文重新计费，因此上下文越低越省钱 —— 即使缓存命中率达 90%+，未缓存部分仍按全价计费。
+- **超长上下文不丢关键内容** —— 实测单会话 **3,300+ 条消息、3 亿+ 累计 token**；架构上支持单会话 **10 万条消息**（5 位消息 ID 空间）。
 
 ---
 
-## Proven at scale
+## 实战验证
 
-Real engineering context, in practice.
+真实工程中的上下文情况。
 
-**Across 6 active engineering sessions (11,000+ API calls), context p90 stays
-at 150K–190K (15–19%), p95 at 160K–210K (16–21%) of the 1M window — with an
-aggregate prompt-cache hit ratio of 91%.** The cache metric is explained in
-[Impact on Prompt Caching](#impact-on-prompt-caching).
+**在 6 个活跃工程会话（11,000+ 次 API 调用）中，上下文 p90 稳定在 15 万–19 万（15–19%），p95 在 16 万–21 万（16–21%）—— 聚合缓存命中率达 91%。** 缓存指标的含义见[对 Prompt 缓存的影响](#对-prompt-缓存的影响)。
 
-| Session   | Duration    | Messages | API calls | Cumulative | Cache hit | Context p50 | Context p90 | Context p95 |
-| --------- | ----------- | -------- | --------- | ---------- | --------- | ----------- | ----------- | ----------- |
-| 0b89319b  | 230h (9.5d) | 3,344    | 2,796     | 339M       | 93%       | 108K (11%)  | 167K (17%)  | 210K (21%)  |
-| 0a3be0cd  | 130h (5.4d) | 3,183    | 2,499     | 276M       | 91%       | 104K (10%)  | 145K (15%)  | 153K (15%)  |
-| 0b2cd5a7  | 131h (5.4d) | 2,560    | 2,181     | 314M       | 91%       | 142K (14%)  | 191K (19%)  | 197K (20%)  |
-| 08f2d501  | 37h (1.5d)  | 1,985    | 1,888     | 196M       | 95%       | 100K (10%)  | 156K (16%)  | 168K (17%)  |
-| 1410c791† | 865h (36d)  | 1,279    | 1,100     | 218M       | 87%       | 132K (13%)  | 407K (41%)  | 427K (43%)  |
-| 096cf8c4  | 72h (3d)    | 1,041    | 918       | 91M        | 89%       | 92K (9%)    | 148K (15%)  | 161K (16%)  |
+| 会话      | 时长        | 消息数 | API 调用 | 累计 token | 缓存命中率 | 上下文 p50  | 上下文 p90  | 上下文 p95  |
+| --------- | ----------- | ------ | -------- | ---------- | ---------- | ----------- | ----------- | ----------- |
+| 0b89319b  | 230h (9.5d) | 3,344  | 2,796    | 3.39 亿    | 93%        | 10.8万(11%) | 16.7万(17%) | 21.0万(21%) |
+| 0a3be0cd  | 130h (5.4d) | 3,183  | 2,499    | 2.76 亿    | 91%        | 10.4万(10%) | 14.5万(15%) | 15.3万(15%) |
+| 0b2cd5a7  | 131h (5.4d) | 2,560  | 2,181    | 3.14 亿    | 91%        | 14.2万(14%) | 19.1万(19%) | 19.7万(20%) |
+| 08f2d501  | 37h (1.5d)  | 1,985  | 1,888    | 1.96 亿    | 95%        | 10.0万(10%) | 15.6万(16%) | 16.8万(17%) |
+| 1410c791† | 865h (36d)  | 1,279  | 1,100    | 2.18 亿    | 87%        | 13.2万(13%) | 40.7万(41%) | 42.7万(43%) |
+| 096cf8c4  | 72h (3d)    | 1,041  | 918      | 0.91 亿    | 89%        | 9.2万(9%)   | 14.8万(15%) | 16.1万(16%) |
 
-† Bug-testing session; p95 is abnormally high. Excluding it, p95 stays ≤ 210K
-across all other sessions.
+† Bug 测试会话，p95 异常偏高。排除该会话后，其余会话 p95 均 ≤ 21 万。
 
-(Context percentages are of the 1M window.)
+（上下文百分比均以 1M 窗口计。）
 
 ---
 
-## Installation
+## 安装
 
-> ⚠️ This installs the **V1** plugin and targets OpenCode **1.x**. It does
-> not load on OpenCode **2.x**.
+需要 OpenCode **>=2.1.4 且 <3**、Git，以及用于构建包的 Node.js/npm。
+通过 GitHub release tag 全局安装：
 
 ```bash
-opencode plugin opencode-acp@stable --global
+opencode plugin add github:infituit/opencode-acp#v2.0.0
 ```
 
-Or add to your opencode config:
+或者在 `opencode.json(c)` 中添加固定到该 tag 的 Git 包：
 
 ```json
 {
-    "plugin": {
-        "opencode-acp": "stable"
-    }
+    "$schema": "https://opencode.ai/config.json",
+    "plugins": ["github:infituit/opencode-acp#v2.0.0"]
 }
 ```
 
+移除已有的 npm 或本地 ACP 插件项，避免重复加载。修改配置后执行 `/reload`。
+GitHub 自动生成的源码归档不含 `dist/`。
+
 ---
 
-## How It Works
+## 工作原理
 
-ACP hands the context-compression tool directly to the model. The model is
-**100% responsible** for context compression. The model's primary tools are
-**compress** and **decompress**, supported by **acp_status** (context monitoring)
-and **search_context** (search compressed content). Compression uses a
-**three-tier LSM-tree architecture** (T1 capture → T2 distill → T3 condense)
-that keeps context bounded for years. A hardcoded 100% GC fallback acts as a
-safety net when the context window is completely full.
+ACP 把上下文压缩工具直接交给模型。模型对上下文压缩**负全责**。模型的主要工具是 **compress** 和 **decompress**，辅以 **acp_status**（上下文监控）和 **search_context**（搜索已压缩内容）。压缩采用**三级 LSM-tree 架构**（T1 捕获 → T2 蒸馏 → T3 浓缩），使上下文在数年内保持有界。当上下文达到 100% 时，系统自动触发 GC 截断作为兜底。
 
-### Lifecycle — Three-Tier Compression
+### 生命周期 — 三级压缩
 
-ACP uses a **three-tier LSM-tree compression architecture**, inspired by
-database storage engines. Each tier compresses the previous tier's output,
-creating progressively denser summaries with natural frequency decrease:
+ACP 采用**三级 LSM-tree 压缩架构**，灵感来自数据库存储引擎。每一级压缩上一级的输出，产生逐渐精炼的摘要，频率自然递减：
 
 ```mermaid
 stateDiagram-v2
-    Raw --> Tier1 : compress (every ~7 turns)
-    Tier1 --> Tier2 : distill (every ~250 turns)
-    Tier2 --> Tier3 : condense (every ~2500 turns)
+    Raw --> Tier1 : compress（约每 7 轮）
+    Tier1 --> Tier2 : distill（约每 250 轮）
+    Tier2 --> Tier3 : condense（约每 2500 轮）
     Tier1 --> Raw : decompress
-    Tier2 --> Raw : decompress (recursive)
-    Tier3 --> Raw : decompress (recursive)
-    Tier1 --> GC_Truncated : GC at 100% context
+    Tier2 --> Raw : decompress（递归）
+    Tier3 --> Raw : decompress（递归）
+    Tier1 --> GC_Truncated : GC（100% 上下文）
 ```
 
-| Tier   | Name     | Input                                | Output                       | Compression ratio | When it fires                          |
-| ------ | -------- | ------------------------------------ | ---------------------------- | ----------------- | -------------------------------------- |
-| **T1** | Capture  | Raw conversation                     | Detailed summary             | ~45×              | Context exceeds `maxContextLimit`      |
-| **T2** | Distill  | T1 summaries (≥ `nudgeGrowthTokens`) | Condensed decisions/outcomes | ~10×              | T1 summaries accumulate past threshold |
-| **T3** | Condense | T2 summaries (≥ `nudgeGrowthTokens`) | Bare facts (1-3 per block)   | ~5×               | T2 summaries accumulate past threshold |
+| 层级   | 名称 | 输入                             | 输出                  | 压缩比 | 触发时机                     |
+| ------ | ---- | -------------------------------- | --------------------- | ------ | ---------------------------- |
+| **T1** | 捕获 | 原始对话                         | 详细摘要              | ~45×   | 上下文超过 `maxContextLimit` |
+| **T2** | 蒸馏 | T1 摘要（≥ `nudgeGrowthTokens`） | 精炼的决策/结果       | ~10×   | T1 摘要累积超过阈值          |
+| **T3** | 浓缩 | T2 摘要（≥ `nudgeGrowthTokens`） | 纯事实（每块 1-3 条） | ~5×    | T2 摘要累积超过阈值          |
 
-**How triggers work:**
+**触发机制：**
 
-- **T1** fires when raw context exceeds the configured limit. The model sees
-  compressible ranges and writes a detailed summary preserving file paths,
-  signatures, decisions, and rationale.
-- **T2** fires when T1 summary tokens reach `nudgeGrowthTokens` (fixed default
-  50000). The model distills old T1 blocks — keeping decisions and
-  outcomes, dropping verbose process details.
-- **T3** fires when T2 summary tokens reach the same threshold. The model
-  condenses to bare facts (shipped releases, key bugs, architecture decisions).
+- **T1** 在原始上下文超过配置限制时触发。模型看到可压缩范围，编写详细摘要，保留文件路径、函数签名、决策和理由。
+- **T2** 在 T1 摘要 token 达到 `nudgeGrowthTokens`（固定默认 50000）时触发。模型蒸馏旧的 T1 块 — 保留决策和结果，丢弃冗长的过程细节。
+- **T3** 在 T2 摘要 token 达到同样阈值时触发。模型浓缩为纯事实（已发布的版本、关键 bug、架构决策）。
 
-Each tier has an **independent cadence counter** — T2 firing doesn't block T3.
-T1 has priority via a `!shouldInject` guard: if T1 fires, T2/T3 wait until next
-turn. This ensures raw context compression happens first (it has the biggest
-impact).
+每层有**独立的节奏计数器** — T2 触发不阻塞 T3。T1 通过 `!shouldInject` 守卫获得优先级：如果 T1 触发了，T2/T3 等到下一轮。这确保原始上下文压缩优先发生（影响最大）。
 
-**Session capacity** — total tokens a single session can process from empty → T1 →
-T2 → T3 → context limit (real-calibrated: 500 API calls/day, ~9.6K new tokens/call,
-T1=45x/T2=10x/T3=3x):
+模型对所有层级使用**同一个 `compress` 工具**。T2/T3 压缩使用块 ID 作为边界（`compress({ content: [{ startId: "b5", endId: "b20", summary: "..." }] })`）。层级根据被消费的块自动检测。
 
-| Context limit        | 1 month  | 3 months  | At limit      | Limit reached     |
-| -------------------- | -------- | --------- | ------------- | ----------------- |
-| 1M                   | 1.9B tok | 10.5B tok | **68.9B tok** | day 259 (~8.6 mo) |
-| 400K                 | 1.9B tok | 10.3B tok | **10.3B tok** | day 89 (~3 mo)    |
-| 400K (200 calls/day) | 559M tok | 2.5B tok  | **9.5B tok**  | day 212 (~7 mo)   |
+**会话容量** — 一个会话从空 → T1 → T2 → T3 → 上下文极限，总共可以处理多少 token（真实校准：500 次 API 调用/天，~9.6K 新 token/调用，T1=45x/T2=10x/T3=3x）：
 
-**Token savings** — without ACP, context grows unbounded and the session crashes
-after ~100 API calls (~0.2 days). With ACP, context is bounded by compression:
+| 上下文上限          | 1 个月     | 3 个月     | 到极限         | 极限时间             |
+| ------------------- | ---------- | ---------- | -------------- | -------------------- |
+| 1M                  | 19 亿 tok  | 105 亿 tok | **689 亿 tok** | 第 259 天（~8.6 月） |
+| 400K                | 19 亿 tok  | 103 亿 tok | **103 亿 tok** | 第 89 天（~3 月）    |
+| 400K（200 调用/天） | 5.6 亿 tok | 25 亿 tok  | **95 亿 tok**  | 第 212 天（~7 月）   |
 
-| Metric                 | Without ACP | With ACP (1M model)         |
-| ---------------------- | ----------- | --------------------------- |
-| Session lifetime       | ~0.2 days   | 259 days (**1295x** longer) |
-| Total tokens processed | ~52M        | 68.9B (**1325x** more work) |
+**Token 节省** — 无 ACP 时上下文无限增长，约 100 次 API 调用后崩溃（~0.2 天）。有 ACP 时上下文被压缩在有界范围：
 
-The core value: ACP doesn't just reduce per-call token cost — it enables a single
-session to process **1000x more total work** by keeping context bounded across
-the full session lifetime.
+| 指标          | 无 ACP   | 有 ACP（1M 模型）        |
+| ------------- | -------- | ------------------------ |
+| 会话寿命      | ~0.2 天  | 259 天（**长 1295 倍**） |
+| 总 token 产出 | ~5200 万 | 689 亿（**多 1325 倍**） |
 
-The model uses the **same `compress` tool** for all tiers. T2/T3 compressions
-use block IDs as boundaries (`compress({ content: [{ startId: "b5", endId: "b20", summary: "..." }] })`). Tier is auto-detected from consumed blocks.
+核心价值：ACP 不是减少每次调用的 token 成本，而是**让一个会话能处理 1000 倍以上的工作量**。
 
-### Compression strategy (Tier 1)
+模型对所有层级使用**同一个 `compress` 工具**。T2/T3 压缩使用块 ID 作为边界（`compress({ content: [{ startId: "b5", endId: "b20", summary: "..." }] })`）。层级根据被消费的块自动检测。
 
-The system injects a prompt telling the model the current context ratio, the
-compression ratio, whether context is idle, and compression suggestions. When the
-trigger ratio is hit, content is compressed in **priority order**:
+### 压缩策略（一级压缩 / Tier 1）
 
-1. Agent/subagent review & consultation results (largest block of uncompressed content)
-2. Verbose command output (build/test runs, git diff/log/status, directory listings)
-3. Exploration that led nowhere (failed approaches, dead-end searches)
-4. Redundant tool results (reading the same file repeatedly, repeated status checks)
-5. Intermediate steps of completed multi-step tasks
-6. Resolved discussion threads (once a decision is recorded)
-7. Large file contents already used
+系统会注入一段 prompt，告诉模型当前的上下文比例、压缩比例、上下文是否空闲，以及压缩建议。当触发比例被命中时，内容按**优先级顺序**被压缩：
 
-After compression, the original content is replaced by a short **block** that
-references the original (recoverable via `decompress`).
+1. Agent/子代理的评审与咨询结果（最大一块未压缩内容）
+2. 冗长的命令输出（构建/测试运行、git diff/log/status、目录列表）
+3. 无结果的探索（失败的方法、死胡同式的搜索）
+4. 冗余的工具结果（反复读同一个文件、重复的状态检查）
+5. 已完成多步任务的中间步骤
+6. 已尘埃落定的讨论（一旦决策被记录）
+7. 已经用过的大段文件内容
 
-### Decompression strategy
+压缩完成后，原始内容被一个简短的 **block** 替换，该 block 引用原始内容（可通过 `decompress` 恢复）。
 
-The model decides when to decompress. When the context is large enough to
-interfere with the model's self-attention, short blocks lead the model to compress
-some content first, handle the urgent matter, then decompress what it needs in
-later work.
+### 解压策略
 
-### GC safety net
+由模型决定何时解压。当上下文大到足以干扰模型的 self-attention 时，简短的 block 会让模型先压缩一部分内容，处理完紧急事务，再在后续工作中按需解压。
 
-When context reaches 100%, the system automatically truncates old-gen block summaries to prevent overflow. This is a last-resort safety net — with three-tier compression, the GC rarely activates because T2/T3 distillation keeps summary overhead bounded.
+### GC 兜底
 
-### Quality gate (non-blocking, off by default)
+当上下文达到 100% 时，系统自动截断老年代 block 摘要，防止上下文溢出。这是最后的兜底机制 — 有了三级压缩，GC 极少激活，因为 T2/T3 蒸馏将摘要开销控制在有界范围内。
 
-After each `compress` call, ACP can run a pluggable quality gate to detect summaries that catastrophically lost content (e.g., a 5K-token range compressed to a 147-char summary with none of the technical keywords). Failures only emit `logger.warn` — they never reject the compression (the result is already committed to state and visible to the model).
+### 质量门控（非阻塞，默认关闭）
 
-The default algorithm (`rouge-recall-v1`) is a two-layer gate calibrated against 6,913 real-world blocks:
+每次 `compress` 调用之后，ACP 可以运行一个可拔插的质量门控，检测摘要是否灾难性丢失了内容（例如：5K token 的范围被压缩成 147 字符、且不含任何技术关键词的摘要）。失败只发出 `logger.warn`——绝不拒绝压缩（结果已经提交到状态、对模型可见）。
 
-- **L1 (length floor)**: Catches catastrophic retention failures — summaries shorter than 200 chars OR with <1% retention vs. the original. 100% recall, 0% FPR.
-- **L2 (content coverage)**: Only runs on blocks that pass L1. Flags when **both** ROUGE-1 F1 < 0.05 **and** top-20 keyword recall < 0.20 (AND-combine keeps FPR at ~6.6%).
+默认算法 `rouge-recall-v1` 是基于 6,913 个真实块校准的两层门控：
 
-The interface is pluggable: future algorithms (e.g., LLM-as-judge via external API) can be registered through `registerQualityGate()` without touching pipeline wiring. Tokenizer uses hand-rolled word-level tokenization (English keywords + Chinese unigrams/bigrams) — not ACP's BPE tokenizer, which is too coarse for ROUGE-style matching.
+- **L1（长度下限）**：捕获灾难性留存失败——摘要短于 200 字符 OR 留存率低于原始的 1%。100% 召回，0% 误报。
+- **L2（内容覆盖）**：只在通过 L1 的块上运行。当 **同时** ROUGE-1 F1 < 0.05 **且** top-20 关键词召回 < 0.20 时触发（AND 合并使误报率维持在 ~6.6%）。
 
-Off by default for one release of burn-in. To enable:
+接口可拔插：未来算法（例如通过外部 API 的 LLM-as-judge）可通过 `registerQualityGate()` 注册，无需改动 pipeline 接线。分词器使用手写的词级分词（英文关键词 + 中文 unigram/bigram），不使用 ACP 的 BPE 分词器——后者对 ROUGE 风格的匹配粒度过粗。
+
+默认关闭，发布一个版本的烧入期后再开启。启用方式：
 
 ```jsonc
 {
@@ -238,48 +199,43 @@ Off by default for one release of burn-in. To enable:
 
 ---
 
-## Impact on Prompt Caching
+## 对 Prompt 缓存的影响
 
-Historically, ACP has fixed many of the low-cache-hit-rate problems caused by
-DCP. The overall cache hit rate is now **~91%**.
+历史上 ACP 修复了大量由 DCP 导致的低缓存命中率问题。目前整体缓存命中率约为 **91%**。
 
-ACP keeps the conversation prefix append-only while compressed ranges are
-replaced by compact blocks. This preserves the provider's reusable prefix and
-keeps total context around **~10–15% most of the time** (p50 100K, p90 150K of
-the 1M window).
+ACP 保持对话前缀只追加，同时用紧凑 block 替换已压缩范围。这样可以保留服务商可复用的前缀，并将总上下文大部分时间维持在 **~10–15%**（以 1M 窗口计，p50 10 万、p90 15 万）。
 
-**Conclusion:** ACP keeps context bounded, preserves the reusable prefix, and
-retains compressed content for on-demand recovery.
+**结论：** ACP 保持上下文有界、保留可复用前缀，并支持按需恢复已压缩内容。
 
 ---
 
-## Commands
+## 命令
 
-ACP provides an `/acp` slash command (also accepts `/dcp` for backward compatibility):
+ACP 提供 `/acp` 斜杠命令（为向后兼容也接受 `/dcp`）：
 
-| Command        | Description                                                                                                                |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `/acp`         | Show compression status (same as `/acp stats`). Use `/acp help` for the command list                                       |
-| `/acp context` | Token usage breakdown by category (system, user, assistant, tools, etc.) and how much has been saved through pruning       |
-| `/acp stats`   | Compression status: blocks, context usage, ranges (same report as the `acp_status` tool)                                   |
-| `/acp export`  | Export active compression blocks to a markdown file. Options: `--output <path>`, `--tier t1,t2,t3`, `--stdout`, `--append` |
+| 命令           | 说明                                                                                               |
+| -------------- | -------------------------------------------------------------------------------------------------- |
+| `/acp`         | 显示压缩状态（同 `/acp stats`）；`/acp help` 查看命令列表                                          |
+| `/acp context` | 按类别（system、user、assistant、tools 等）显示 token 用量明细，以及通过剪枝节省的量               |
+| `/acp stats`   | 压缩状态：压缩块、上下文用量、推荐范围（与 `acp_status` 工具同一报告）                             |
+| `/acp export`  | 导出活动压缩块到 markdown 文件。选项：`--output <path>`、`--tier t1,t2,t3`、`--stdout`、`--append` |
 
 ---
 
-## Configuration
+## 配置
 
-ACP uses its own config file, searched in order:
+ACP 使用自己的配置文件，按以下顺序搜索：
 
-1. **Global:** `~/.config/opencode/acp.jsonc` (or `acp.json`), created automatically on first run
-2. **Custom config directory:** `$OPENCODE_CONFIG_DIR/acp.jsonc` (or `acp.json`), if `OPENCODE_CONFIG_DIR` is set
-3. **Project:** `.opencode/acp.jsonc` (or `acp.json`) in your project's `.opencode` directory
+1. **全局：** `~/.config/opencode/acp.jsonc`（或 `acp.json`），首次运行时自动创建
+2. **自定义配置目录：** `$OPENCODE_CONFIG_DIR/acp.jsonc`（或 `acp.json`），当设置了 `OPENCODE_CONFIG_DIR` 时
+3. **项目级：** 项目 `.opencode` 目录下的 `.opencode/acp.jsonc`（或 `acp.json`）
 
-Each level overrides the previous, so project settings take priority over global. Restart OpenCode after making config changes.
+每一层覆盖前一层，因此项目设置优先于全局设置。修改配置后请重启 OpenCode。
 
-> **📖 Full parameter reference:** The configuration reference is being rewritten. The JSON schema is available in [`dcp.schema.json`](./dcp.schema.json).
+> **📖 完整参数参考：** 配置参考文档正在重写；完整字段结构见 [`dcp.schema.json`](./dcp.schema.json)。
 
 > [!IMPORTANT]
-> **Disable OpenCode's built-in auto-compaction.** ACP handles context management itself — OpenCode's compaction conflicts with ACP and can cause issues (re-expanded messages, lost compression state). Add to your `opencode.json`:
+> **禁用 OpenCode 的内置自动压缩。** ACP 自行处理上下文管理 — OpenCode 的压缩与 ACP 冲突，可能导致问题（消息重新展开、压缩状态丢失）。请在 `opencode.json` 中添加：
 >
 > ```jsonc
 > {
@@ -289,31 +245,30 @@ Each level overrides the previous, so project settings take priority over global
 > }
 > ```
 >
-> Or set the environment variable: `OPENCODE_DISABLE_AUTOCOMPACT=1`
+> 或设置环境变量：`OPENCODE_DISABLE_AUTOCOMPACT=1`
 
 > [!NOTE]
-> If you use models with smaller context windows, such as GitHub Copilot models or local models, lower `compress.minContextLimit` and `compress.maxContextLimit` in your configuration to match the available context.
+> 如果你使用上下文窗口较小的模型（如 GitHub Copilot 模型或本地模型），请在配置中降低 `compress.minContextLimit` 和 `compress.maxContextLimit` 以匹配可用上下文。
 
 <details>
-<summary><strong>Default Configuration</strong> (click to expand)</summary>
+<summary><strong>默认配置</strong>（点击展开）</summary>
 
 ```jsonc
 {
     "$schema": "https://raw.githubusercontent.com/infituit/opencode-acp/master/dcp.schema.json",
     // Enable or disable the plugin
     "enabled": true,
-    // Automatically update npm-installed ACP when a newer version is available
-    // on the installed dist-tag/spec (@stable follows stable, @latest follows latest).
-    // Version-locked plugin specs are not updated.
+    // 自动更新 npm 安装的 ACP：跟踪安装所用 dist-tag/规范（@stable 跟随 stable，@latest 跟随 latest）。
+    // 版本锁定的规范不会被更新。
     "autoUpdate": true,
-    // File log verbosity: "debug" | "info" | "warn" | "error" | "silent".
-    // Default "info" writes decision-level events (nudges, transforms, updates)
-    // to ~/.config/opencode/logs/acp/daily/<date>.log
+    // 文件日志级别: "debug" | "info" | "warn" | "error" | "silent"
+    // 默认 "info"：决策级事件（压缩提示、转换摘要、更新检查）落盘到
+    // ~/.config/opencode/logs/acp/daily/<日期>.log
     "logLevel": "info",
-    // Enable full DEBUG logging + per-request snapshots (overrides logLevel)
+    // 启用完整 DEBUG 日志 + 按请求快照（优先于 logLevel）
     "debug": false,
     // Notification display: "off", "minimal", or "detailed"
-    "pruneNotification": "off",
+    "pruneNotification": "detailed",
     // Notification type: "chat" (deprecated, falls back to toast) or "toast" (system toast)
     "pruneNotificationType": "toast",
     // Slash commands configuration
@@ -324,7 +279,7 @@ Each level overrides the previous, so project settings take priority over global
     },
     // Manual mode: disables autonomous context management,
     // tools only run when explicitly triggered via /acp commands
-    // Allow ACP processing in subagent sessions (default: true)
+    // 允许在子代理会话中运行 ACP（默认：开启）
     "allowSubAgents": true,
     // Experimental settings
     "experimental": {
@@ -348,12 +303,11 @@ Each level overrides the previous, so project settings take priority over global
         // Soft upper threshold: above this, ACP keeps injecting strong
         // compression nudges (based on nudgeFrequency), so compression is
         // much more likely. Accepts: number or "X%" of model context window.
-        "maxContextLimit": "80%",
-        // Soft lower threshold for turn/iteration reminder nudges: below this,
-        // those reminders are off (compression less likely). At/above this, they
-        // are on. Growth nudges have their own floor: minNudgeContextPercent.
-        // Accepts: number or "X%" of model context window.
-        "minContextLimit": "80%",
+        "maxContextLimit": "55%",
+        // Soft lower threshold for reminder nudges: below this, turn/iteration
+        // reminders are off (compression less likely). At/above this, reminders
+        // are on. Accepts: number or "X%" of model context window.
+        "minContextLimit": "45%",
         // Optional per-model override for maxContextLimit by providerID/modelID.
         // If present, this wins over the global maxContextLimit.
         // Accepts: number or "X%".
@@ -363,18 +317,18 @@ Each level overrides the previous, so project settings take priority over global
         //     "anthropic/claude-sonnet-4.6": "80%"
         // },
         // Optional per-model override for minContextLimit.
-        // DEPRECATED — scheduled for removal alongside minContextLimit;
-        // use compress.providers (or minNudgeContextPercent for growth
-        // nudges) instead. Still honored until removed.
+        // 已废弃 —— 将随 minContextLimit 一并移除；
+        // 请改用 compress.providers（增长型提醒用
+        // minNudgeContextPercent）。移除前仍然生效。
         // If present, this wins over the global minContextLimit.
         // "modelMinLimits": {
         //     "openai/gpt-5.3-codex": 50000,
         //     "anthropic/claude-sonnet-4.6": "25%"
         // },
-        // Nested per-provider/per-model overrides for ANY compress field
-        // (23 fields: thresholds, nudge behavior, protection, ...).
-        // Resolution is per field: model > provider > global. Unknown
-        // provider/model IDs fall back to the global value.
+        // 嵌套的 provider/model 级覆盖：可覆盖任意 compress 字段
+        // （23 项：阈值、nudge 行为、保护策略等）。
+        // 逐字段解析优先级：model > provider > 全局。
+        // 未知的 provider/model ID 回退到全局值。
         // "providers": {
         //     "anthropic": {
         //         "nudgeGrowthTokens": 50000,
@@ -405,66 +359,62 @@ Each level overrides the previous, so project settings take priority over global
         // Preserve your messages during compression.
         // Warning: large copy-pasted prompts will never be compressed away
         "protectUserMessages": false,
-        // [#368] Drop oversized reasoning (thinking) from historical compress
-        // tool calls at request time. compress calls are hard-exempt from
-        // compression, so their thinking rides along every request as an
-        // unreclaimable floor. Closed turns only; the active round is never
-        // touched. Small thinkings under the threshold are kept.
+        // [#368] 请求时丢弃历史 compress 工具调用中超大的 reasoning（思考）。
+        // compress 调用被硬排除在压缩之外，其思考内容会随每次请求原样重发，
+        // 形成无法回收的上下文底座。仅作用于已关闭的轮次，活跃轮永不触碰；
+        // 低于阈值的小思考保留。
         "reasoning": {
             "drop": true,
             "threshold": 2048,
         },
-        // [#478] Image archive: spill data-URL images to disk when they enter
-        // the session so folded ranges keep re-readable pointers instead of
-        // silently dropping the pixels. Files land in
-        // <storageDir>/images/<dirName(sessionId)>/ (mode 0600); block
-        // summaries covering them append absolute paths for the model to
-        // re-read with its own file tools. Not part of the per-model cascade.
+        // [#478] 图片归档：图片（data-URL）进入会话时即落盘，折叠后摘要里保留
+        // 可重读的路径指针，而不是把像素悄悄丢掉。文件落在
+        // <storageDir>/images/<dirName(sessionId)>/（权限 0600）；覆盖它们的折叠块
+        // 摘要末尾追加绝对路径，模型用自己的文件工具重新读取即可。
+        // 不参与按模型的覆盖级联。
         "images": {
             "enabled": true,
             "minBytes": 16384,
             "ttlDays": 7,
         },
     },
-    // Garbage collection — hardcoded 100% fallback only
+    // 垃圾回收与批量清理
     "gc": {
         "algorithm": "truncate",
-        // young → old generation promotion after this many survivals
+        // 存活此次数后从新生代晋升为老年代
         "promotionThreshold": 5,
-        // deactivate a block after this many survivals
+        // 存活此次数后停用该块
         "maxBlockAge": 15,
-        // truncate old-gen summaries exceeding this length (chars)
+        // 截断超过此长度（字符）的老年代摘要
         "maxOldGenSummaryLength": 3000,
-        // run major GC when context usage exceeds this (hardcoded, not configurable)
+        // 上下文使用率超过此值时执行主 GC（兜底，硬编码为 100%）
         "majorGcThresholdPercent": "100%",
     },
-    // Post-compression quality gate (non-blocking; off by default)
+    // 压缩后质量门控（非阻塞；默认关闭）
     "qualityGate": {
-        // Master switch. When false, no evaluation runs.
+        // 主开关。false 时不执行任何评估
         "enabled": false,
-        // Algorithm name. Pluggable — future algorithms (including external
-        // API judges) can be registered without changing pipeline wiring.
+        // 算法名。可拔插——未来算法（包括外部 API 评审）可以注册而无需改 pipeline
         "algorithm": "rouge-recall-v1",
-        // Per-algorithm config
+        // 各算法的独立配置
         "algorithms": {
             "rouge-recall-v1": {
-                // Hard floor on summary length (chars). Below this → L1 fails.
+                // 摘要长度硬下限（字符）。低于此值 → L1 失败
                 "layer1MinChars": 200,
-                // Min retention = summaryLen / (compressedTokens*4) * 100.
-                // Catches catastrophic retention failures (<1%) with 0% FPR.
+                // 最小留存率 = summaryLen / (compressedTokens*4) * 100
+                // 捕获灾难性留存失败（<1%），0% 误报
                 "layer1MinRetentionPct": 1.0,
-                // L2 fails (combined with top20Recall via AND) when below this.
+                // 当 ROUGE-1 F1 低于此值时（与 top20Recall 经 AND 合并）L2 失败
                 "layer2MaxRougeF1": 0.05,
-                // L2 fails (combined with rougeF1 via AND) when below this.
+                // 当 top-20 关键词召回低于此值时（与 rougeF1 经 AND 合并）L2 失败
                 "layer2MaxTop20Recall": 0.2,
             },
         },
     },
-    // Message filters — strip/deduplicate third-party plugin injections
-    // (e.g. oh-my-opencode system reminders) from visible context before
-    // ACP processes them. Filtered content is never counted toward context
-    // usage. Five built-in OMO filters are on by default (v1.14.8+);
-    // See dcp.schema.json for the complete messageFilters schema.
+    // 消息过滤器——在 ACP 处理之前，从可见上下文中剥离/去重第三方插件注入
+    // （例如 oh-my-opencode 的 system reminder）。被过滤的内容不计入上下文使用量。
+    // 5 个内置 OMO 过滤器默认开启（v1.14.8+）；
+    // 完整的 messageFilters 结构见 dcp.schema.json。
     "messageFilters": {
         "enabled": true,
         "filters": {
@@ -480,9 +430,9 @@ Each level overrides the previous, so project settings take priority over global
 
 </details>
 
-### Per-Provider / Per-Model Overrides
+### 按 Provider / 按模型覆盖
 
-Any `compress` field can be overridden per provider and per model via the nested `compress.providers` map:
+任意 `compress` 字段都可通过嵌套的 `compress.providers` 按 provider 和按模型覆盖：
 
 ```jsonc
 {
@@ -501,15 +451,15 @@ Any `compress` field can be overridden per provider and per model via the nested
 }
 ```
 
-Resolution is **per field**: model > provider > global. Unknown provider/model IDs fall back to the global value. A nested `maxContextLimit` also wins over the legacy flat `modelMaxLimits` map. Overrides deep-merge across the three config layers (global → config dir → project) per provider/model key.
+解析为**逐字段**优先级：model > provider > 全局。未知的 provider/model ID 回退到全局值。嵌套的 `maxContextLimit` 同时优先于旧版扁平 `modelMaxLimits` 映射。多层配置（全局 → 配置目录 → 项目）按 provider/model 键深合并。
 
-Not overridable here: `permission`, the deprecated `minContextLimit` / `modelMinLimits` family, and the flat `modelMaxLimits` / `modelMinLimits` maps themselves. Note: `modelMaxLimits` is **not** deprecated — it stays fully supported; a nested `maxContextLimit` simply outranks it.
+不可覆盖：`permission`、已废弃的 `minContextLimit` / `modelMinLimits` 系列、以及扁平 `modelMaxLimits` / `modelMinLimits` 映射自身。注意：`modelMaxLimits` **未废弃** —— 仍完全支持，只是优先级低于嵌套的 `maxContextLimit`。
 
-The [`dcp.schema.json`](./dcp.schema.json) schema lists the complete `compress.providers` field surface.
+完整的 `compress.providers` 字段结构见 [`dcp.schema.json`](./dcp.schema.json)。
 
-### Prompt Overrides
+### Prompt 覆盖
 
-ACP exposes six editable prompts:
+ACP 暴露六个可编辑的 prompt：
 
 - `system`
 - `compress-range`
@@ -518,91 +468,90 @@ ACP exposes six editable prompts:
 - `turn-nudge`
 - `iteration-nudge`
 
-This feature is disabled by default. Set `experimental.customPrompts` to `true` in your ACP config to activate it.
+此功能默认禁用。在 ACP 配置中将 `experimental.customPrompts` 设为 `true` 以激活。
 
-When enabled, managed defaults are written to `~/.config/opencode/acp-prompts/defaults/` as plain-text prompt files. A single `README.md` in that directory explains each prompt and how to create overrides.
+启用后，托管的默认值会作为纯文本 prompt 文件写入 `~/.config/opencode/acp-prompts/defaults/`。该目录中的 `README.md` 解释了每个 prompt 以及如何创建覆盖。
 
-To customize behavior, add a file with the same name under an overrides directory and edit it as plain text.
+要自定义行为，在覆盖目录下添加同名文件并作为纯文本编辑。
 
-To reset an override, delete the matching file from your overrides directory.
+要重置覆盖，从覆盖目录中删除对应文件。
 
-### Protected Tools
+### 受保护工具
 
-By default, these tools are always protected from pruning:
-`task`, `skill`, `todowrite`, `todoread`, `compress`, `decompress`, `batch`, `plan_enter`, `plan_exit`, `write`, `edit`
+默认情况下，以下工具始终受保护不被剪枝：
+`task`、`skill`、`todowrite`、`todoread`、`compress`、`decompress`、`batch`、`plan_enter`、`plan_exit`、`write`、`edit`
 
-The `protectedTools` array in `commands` adds to this default list.
+`commands` 中的 `protectedTools` 数组会添加到此默认列表。
 
-For the `compress` tool, `compress.protectedTools` ensures specific tool outputs are **hard-excluded** from compression ranges (v1.10.0+). When the model compresses a range that includes a protected tool message, that message survives intact in visible context — only the surrounding non-protected messages are compressed. The root default is `["skill", "compress"]` (the `compress` entry protects compress tool calls — which carry summaries — from being eaten by subsequent sequential compressions); an explicit array replaces the inherited policy. **`"compress"` is always force-protected regardless of user config** — its `summary` parameter is the sole record of compressed conversation and cannot be recovered if lost. Setting `[]` protects only `compress`; setting `["task"]` protects `task` and `compress`.
+对于 `compress` 工具，`compress.protectedTools` 确保特定工具的输出被**硬排除**在压缩范围之外（v1.10.0+）。当模型压缩包含受保护工具消息的范围时，该消息完整保留在可见上下文中 — 只有周围的非受保护消息被压缩。根默认值为 `["skill", "compress"]`（`compress` 条目保护携带 summary 的 compress 工具调用，防止被后续顺序压缩吞噬）；显式数组会替换继承的策略。**`"compress"` 无论用户如何配置都会被强制保护** — 其 `summary` 参数是已压缩对话的唯一记录，一旦丢失无法恢复。设置 `[]` 仅保护 `compress`；设置 `["task"]` 保护 `task` 和 `compress`。
 
 ---
 
-## Migrating from DCP
+## 从 DCP 迁移
 
-ACP is a drop-in replacement for DCP. To migrate:
+在 OpenCode **>=2.1.4 且 <3** 上，可按以下步骤迁移 DCP 配置：
 
-1. Remove the old DCP plugin from your `opencode.json`
-2. Install ACP: `opencode plugin opencode-acp@stable --global`
-3. Copy your config: `cp ~/.config/opencode/dcp.jsonc ~/.config/opencode/acp.jsonc`
-4. Copy prompt overrides (if any): `cp -r ~/.config/opencode/dcp-prompts ~/.config/opencode/acp-prompts`
-5. Copy session state (optional, preserves compression blocks): `cp -r ~/.local/share/opencode/storage/plugin/dcp ~/.local/share/opencode/storage/plugin/acp`
-6. Restart OpenCode
+1. 从 `opencode.json` 中移除旧的 DCP 插件
+2. 安装 ACP：`opencode plugin add github:infituit/opencode-acp#v2.0.0`
+3. 复制配置：`cp ~/.config/opencode/dcp.jsonc ~/.config/opencode/acp.jsonc`
+4. 复制 prompt 覆盖（如有）：`cp -r ~/.config/opencode/dcp-prompts ~/.config/opencode/acp-prompts`
+5. 执行 `/reload` 并新建会话。ACP 2.0 使用 OpenCode 原生插件存储；复制旧 JSON 状态文件不会迁移会话或压缩块。
 
-**What changes:**
+**变更的内容：**
 
-- Log directory: `logs/dcp/` to `logs/acp/`
-- Slash command: `/dcp` to `/acp` (both work for backward compatibility)
-- Notification headers: `DCP` to `ACP`
-- Context usage label: `DCP threshold` to `ACP threshold`
+- 日志目录：`logs/dcp/` → `logs/acp/`
+- 斜杠命令：`/acp`
+- 通知标题：`DCP` → `ACP`
+- 上下文用量标签：`DCP threshold` → `ACP threshold`
 
 ---
 
 <details>
-<summary><strong>Bug Fixes (39 total)</strong> -- applied on top of DCP v3.1.11</summary>
+<summary><strong>错误修复（共 39 项）</strong> — 基于 DCP v3.1.11</summary>
 
-| #      | Severity | Summary                                                                                                                                                                                                                                |
-| ------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1      | CRITICAL | State not persisted across restarts -- messageIds, block deactivation, save errors silently lost                                                                                                                                       |
-| 2      | CRITICAL | resetOnCompaction() clears all compression blocks -- undoes all pruning work                                                                                                                                                           |
-| 3      | CRITICAL | prune silently drops summary -- DATA LOSS when no user message precedes anchor                                                                                                                                                         |
-| 4      | CRITICAL | getCurrentTokenUsage returns 0 -- prevents nudge from ever triggering                                                                                                                                                                  |
-| 5      | HIGH     | loadPruneMessagesState duplicates activeBlockIds + reasoning-strip undefined guard                                                                                                                                                     |
-| 6      | HIGH     | Synthetic summary messages get mNNNN refs but are invisible to boundary lookup                                                                                                                                                         |
-| 7      | HIGH     | State not persisted across restarts -- messageIds, block deactivation, and save errors silently lost                                                                                                                                   |
-| 8      | HIGH     | isMessageCompacted() inconsistent with compaction summary message handling                                                                                                                                                             |
-| 9      | HIGH     | Compressed block summaries retain stale mNNNN message ID tags -- model copies stale IDs                                                                                                                                                |
-| 10     | HIGH     | Model uses stale mNNNN IDs from nudges/summaries -- compress fails with "startId not available"                                                                                                                                        |
-| 11     | HIGH     | Major GC skips legacy blocks without generation field -- oversized blocks never collected                                                                                                                                              |
-| 12     | HIGH     | Percentage-based thresholds calculated against effective input context instead of full model context window                                                                                                                            |
-| 13     | HIGH     | Context window leaks -- compressed messages reappear after /compact                                                                                                                                                                    |
-| 14     | HIGH     | Compression notifications write full block summaries to DB -- can reach 150KB+ per notification                                                                                                                                        |
-| 15     | HIGH     | npm auto-install overwrites fork with upstream package                                                                                                                                                                                 |
-| 16     | HIGH     | Summary mNNNN refs in compress output -- model copies stale message IDs                                                                                                                                                                |
-| 17     | HIGH     | Synthetic messages not in messageIdToBlockId -- compress fails to find them                                                                                                                                                            |
-| 18     | HIGH     | Compress stops model from responding after compression completes                                                                                                                                                                       |
-| 19     | HIGH     | Dynamic block guidance breaks API prefix cache                                                                                                                                                                                         |
-| 20     | HIGH     | GC never deactivates old blocks -- dead-weight accumulates indefinitely                                                                                                                                                                |
-| 21     | HIGH     | Logger + tokenizer 20-50s per-turn latency (268x slowdown)                                                                                                                                                                             |
-| 22     | HIGH     | compress throws hard error on reversed block boundaries -- model gives up                                                                                                                                                              |
-| 23--34 | MEDIUM   | Various fixes for dedup, purge errors, schema validation, hook timing, etc.                                                                                                                                                            |
-| 35     | HIGH     | Aging warnings shown at low context usage (<50%) -- triggers unnecessary compress, wastes tokens                                                                                                                                       |
-| 36     | HIGH     | Compression summary emitted as a standalone user message before the user's real turn -- model reads its own prior assistant output as user input, causing dialog role confusion / self-Q&A loops                                       |
-| 37     | HIGH     | Message-transform pipeline runs on OpenCode's hidden title/summary/compaction agent requests -- corrupts the request and shared session state, breaking session title generation                                                       |
-| 38     | CRITICAL | pruneToolOutputs/pruneToolInputs/pruneToolErrors mutate existing messages in-place -- invalidates LLM prefix cache, causing 89% of fresh input tokens to be wasted on cache-invalidating re-sends                                      |
-| 39     | HIGH     | Protected tool outputs (skill/task/todowrite) only soft-protected during compression -- appended to summary then pruned from context, losing semantic authority and susceptible to GC truncation. Fixed with hard-exclusion in v1.10.0 |
+| #      | 严重程度 | 摘要                                                                                                                                    |
+| ------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 1      | 严重     | 状态在重启后未持久化 — messageIds、块停用、保存错误均静默丢失                                                                           |
+| 2      | 严重     | resetOnCompaction() 清除所有压缩块 — 撤销所有剪枝工作                                                                                   |
+| 3      | 严重     | prune 静默丢弃摘要 — 当锚点前无用户消息时导致数据丢失                                                                                   |
+| 4      | 严重     | getCurrentTokenUsage 返回 0 — 导致 nudge 永远无法触发                                                                                   |
+| 5      | 高       | loadPruneMessagesState 重复 activeBlockIds + reasoning-strip 未定义保护缺失                                                             |
+| 6      | 高       | 合成摘要消息获得 mNNNN 引用但对边界查找不可见                                                                                           |
+| 7      | 高       | 状态在重启后未持久化 — messageIds、块停用和保存错误均静默丢失                                                                           |
+| 8      | 高       | isMessageCompacted() 与压缩摘要消息处理不一致                                                                                           |
+| 9      | 高       | 已压缩的块摘要保留过时的 mNNNN 消息 ID 标签 — 模型复制过时 ID                                                                           |
+| 10     | 高       | 模型使用 nudge/摘要中的过时 mNNNN ID — compress 因 "startId not available" 失败                                                         |
+| 11     | 高       | 主 GC 跳过没有 generation 字段的旧块 — 过大的块永远不会被回收                                                                           |
+| 12     | 高       | 基于百分比的阈值基于有效输入上下文而非完整模型上下文窗口计算                                                                            |
+| 13     | 高       | 上下文窗口泄漏 — 压缩后的消息在 /compact 后重新出现                                                                                     |
+| 14     | 高       | 压缩通知将完整块摘要写入数据库 — 每条通知可达 150KB+                                                                                    |
+| 15     | 高       | npm 自动安装用上游包覆盖分支                                                                                                            |
+| 16     | 高       | compress 输出中的摘要 mNNNN 引用 — 模型复制过时的消息 ID                                                                                |
+| 17     | 高       | 合成消息不在 messageIdToBlockId 中 — compress 无法找到它们                                                                              |
+| 18     | 高       | compress 在压缩完成后阻止模型响应                                                                                                       |
+| 19     | 高       | 动态块引导破坏 API 前缀缓存                                                                                                             |
+| 20     | 高       | GC 从不停用旧块 — 死重无限累积                                                                                                          |
+| 21     | 高       | Logger + tokenizer 每轮延迟 20-50 秒（268 倍减速）                                                                                      |
+| 22     | 高       | compress 在块边界反转时抛出硬错误 — 模型放弃                                                                                            |
+| 23--34 | 中       | 去重、错误清除、schema 验证、hook 时序等方面的多项修复                                                                                  |
+| 35     | 高       | 在低上下文使用率（<50%）时显示老化警告 — 触发不必要的 compress，浪费 token                                                              |
+| 36     | 高       | 压缩摘要作为独立的 user 消息插入在用户真实发言之前 — 模型把自己先前的 assistant 输出误读为用户输入，导致对话角色混乱 / 自问自答循环     |
+| 37     | 高       | 消息转换管线对 OpenCode 隐藏的 title/summary/compaction agent 请求也运行 — 污染请求并破坏共享会话状态，导致会话标题生成失效             |
+| 38     | 严重     | pruneToolOutputs/pruneToolInputs/pruneToolErrors 原地修改现有消息 — 破坏 LLM 前缀缓存，导致 89% 的新鲜输入 token 浪费在缓存失效的重发上 |
+| 39     | 高       | 受保护工具输出（skill/task/todowrite）在压缩时仅软保护 — 追加到摘要后从上下文中剪枝，丧失语义权威且易被 GC 截断。v1.10.0 用硬排除修复   |
 
-For the complete list with root cause analysis, see the [bug tracker](https://github.com/infituit/opencode-acp/issues).
+完整列表及根因分析，请参见 [Bug Tracker](https://github.com/infituit/opencode-acp/issues)。
 
 </details>
 
 ---
 
-## Changelog
+## 更新日志
 
-Full release history is maintained in [`support-files/changelog/en/`](./support-files/changelog/en/).
+完整版本历史维护在 [`support-files/changelog/zh/`](./support-files/changelog/zh/)。
 
 ---
 
-## License
+## 许可证
 
-AGPL-3.0-or-later -- This project is a fork of [@tarquinen/opencode-dcp](https://github.com/Tarquinen/opencode-dynamic-context-pruning). Original copyright belongs to the original author. Modifications and bug fixes by ranxianglei.
+AGPL-3.0-or-later — 本项目是 [@tarquinen/opencode-dcp](https://github.com/Tarquinen/opencode-dynamic-context-pruning) 的分支。原始版权归原始作者所有。修改和错误修复由 ranxianglei 完成。
