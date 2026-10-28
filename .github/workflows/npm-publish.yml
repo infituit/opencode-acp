@@ -1,0 +1,85 @@
+name: Publish npm
+
+on:
+    workflow_call:
+        inputs:
+            tag:
+                description: Published GitHub Release tag
+                required: true
+                type: string
+
+permissions:
+    contents: read
+
+concurrency:
+    group: npm-publish-${{ inputs.tag }}
+    cancel-in-progress: false
+
+jobs:
+    publish:
+        if: github.repository == 'infituit/opencode-acp'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            id-token: write
+        env:
+            TAG: ${{ inputs.tag }}
+        steps:
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  registry-url: https://registry.npmjs.org
+
+            - name: Install npm with OIDC support
+              run: npm install --global npm@11 --ignore-scripts --registry https://registry.npmjs.org
+
+            - name: Resolve npm channel and asset
+              id: package
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  node --input-type=module <<'NODE'
+                  import { appendFileSync } from "node:fs"
+
+                  const match = /^v(?<version>\d+\.\d+\.\d+-(?<phase>[a-zA-Z]+)\.\d+(?:-[a-zA-Z0-9][a-zA-Z0-9.-]*)?)$/.exec(process.env.TAG)
+                  if (!match) throw new Error("Invalid release tag")
+                  const { version, phase } = match.groups
+                  const channel = phase === "release" ? "latest" : phase.toLowerCase()
+                  appendFileSync(process.env.GITHUB_OUTPUT, `channel=${channel}\nasset=infituit-opencode-acp-${version}.tgz\n`)
+                  NODE
+
+            - name: Download published release assets
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  GH_REPO: ${{ github.repository }}
+                  ASSET: ${{ steps.package.outputs.asset }}
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  test "$(gh release view "$TAG" --json isDraft --jq '.isDraft')" = false
+                  mkdir -p release-assets
+                  gh release download "$TAG" --pattern "$ASSET" --pattern SHA256SUMS --dir release-assets
+
+            - name: Verify release package
+              working-directory: release-assets
+              shell: bash
+              env:
+                  ASSET: ${{ steps.package.outputs.asset }}
+              run: |
+                  set -euo pipefail
+                  sha256sum --check --ignore-missing SHA256SUMS
+                  node --input-type=module <<'NODE'
+                  import assert from "node:assert/strict"
+                  import { execFileSync } from "node:child_process"
+
+                  const pkg = JSON.parse(execFileSync("tar", ["-xOf", process.env.ASSET, "package/package.json"], { encoding: "utf8" }))
+                  assert.equal(pkg.name, "@infituit/opencode-acp", "Unexpected npm package name")
+                  assert.equal(`v${pkg.version}`, process.env.TAG, "Release tag must match package version")
+                  NODE
+
+            - name: Publish release tarball to npm
+              working-directory: release-assets
+              env:
+                  ASSET: ${{ steps.package.outputs.asset }}
+                  CHANNEL: ${{ steps.package.outputs.channel }}
+              run: npm publish "./$ASSET" --ignore-scripts --access public --tag "$CHANNEL" --registry https://registry.npmjs.org
