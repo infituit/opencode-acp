@@ -39,7 +39,7 @@ QQ群:
 </p>
 
 <p align="center">
-<code>opencode plugin add github:infituit/opencode-acp#v2.0.0</code>
+<code>opencode plugin add github:infituit/opencode-acp#v2.0.0-release.1</code>
 </p>
 
 ---
@@ -82,7 +82,7 @@ ACP 将上下文管理的所有权限交给模型自己，不需要额外模型�
 通过 GitHub release tag 全局安装：
 
 ```bash
-opencode plugin add github:infituit/opencode-acp#v2.0.0
+opencode plugin add github:infituit/opencode-acp#v2.0.0-release.1
 ```
 
 或者在 `opencode.json(c)` 中添加固定到该 tag 的 Git 包：
@@ -90,7 +90,7 @@ opencode plugin add github:infituit/opencode-acp#v2.0.0
 ```json
 {
     "$schema": "https://opencode.ai/config.json",
-    "plugins": ["github:infituit/opencode-acp#v2.0.0"]
+    "plugins": ["github:infituit/opencode-acp#v2.0.0-release.1"]
 }
 ```
 
