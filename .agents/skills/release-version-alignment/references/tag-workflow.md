@@ -1,6 +1,4 @@
-# Tag 时机与发布边界
-
-此流程面向维护者，补充 `docs/developer/release.md`；不授权自动打 tag 或移动 tag。
+# 发布 Tag
 
 ## 确认最终发布提交
 
@@ -8,15 +6,14 @@
 2. 找到已合入默认分支的最终发布提交，而不是第一个标题包含 release/version 的提交。
 3. 若版本对齐、说明或安装引用有补漏 PR，等待它们合入后，重新确认目标提交。
 4. 确认目标提交的 package/lock 版本、双语 changelog 和 Release 工作流一致，相关 CI 已通过。
-5. 向用户报告版本、目标 commit、所在分支、CI 与 tag 是否存在；获得打 tag 和推送的明确授权。
+5. 核对版本、目标 commit、所在分支、CI 结果及 tag 是否已存在。
 
 tag 必须使用 `v{major}.{minor}.{patch}-{phase}.{serial}[-{mark}]`。不要根据 PR 标题推断应发布的阶段。GitHub Release 的正式/预发布属性由 `phase` 决定。
 
-## 执行边界
+## 推送 Tag
 
-- 由维护者的 Git 凭据向官方仓库推送已确认的附注 tag，触发 GitHub Actions。
-- 不使用 `GITHUB_TOKEN` 从另一工作流自动推送 tag 来触发发布。
-- 不本地上传正式包，不执行 `npm publish`，不把 PR 创建或合并授权扩大为发布授权。
+- 使用维护者的 Git 凭据向官方仓库推送附注 tag，触发 GitHub Actions 构建和发布。
+- 使用 `GITHUB_TOKEN` 从另一工作流推送 tag 不会触发 Release 工作流。
 - tag 推送后即可通过 Git 安装，但应等待 Release 工作流成功后再宣布发布。
 
 ## 已存在的 tag 或失败的发布

@@ -5,7 +5,7 @@ description: Use when writing ACP versioned changelog or release notes under sup
 
 # Changelog 文档编写
 
-移植 bk-nodemgr 的版本化双语 changelog 流程，为 ACP 用户和维护者说明发布影响、升级动作、兼容性与可感知变化。输出是概要，不是提交记录；GitHub Actions 将中文与英文文件合并为 GitHub Release 正文。
+编写 ACP 双语发布说明，说明用户可感知的变化、兼容性影响和升级动作。GitHub Actions 将中文与英文文件合并为 GitHub Release 正文。
 
 ## 先读
 
@@ -102,4 +102,4 @@ Full Changelog: [from-tag...to-tag](https://github.com/infituit/opencode-acp/com
 - 运行针对目标文件的既有格式检查和 `git diff --check`。
 - 发布版本发生变化时，与 `release-version-alignment` 配合检查 package/lock 和安装引用。
 
-不为写 changelog 临时创建运行时测试或新增发布门槛。交付中列出文件、事实范围、比较链接状态和确有必要的未决项；正文不混入作者工作记录。
+交付双语文件路径、发布范围和比较链接；未决事项单独列出，不写入发布说明。

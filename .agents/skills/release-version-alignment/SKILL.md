@@ -5,7 +5,7 @@ description: Use when preparing a new opencode-acp release or checking/fixing pa
 
 # Release Version Alignment
 
-为 ACP 准备发布提交，或检查既定版本的遗漏项。移植 bk-nodemgr 的“版本对齐 → 双语 changelog → PR → 合并后 tag”流程，版本字段采用 ACP 的 package 元数据，不引入 Helm 或 API Gateway 步骤。
+对齐 ACP 的 package 版本、双语 changelog 和安装引用，准备发布 PR。
 
 ## 先读规则
 
@@ -45,7 +45,7 @@ description: Use when preparing a new opencode-acp release or checking/fixing pa
 
 仅在安装引用或兼容性要求变化时更新 README 等用户文档。不要改 lockfile 的依赖版本、运行时代码、持久化格式、配置、工作流或历史发布说明；若任务确实需要这些变更，先确认扩大范围。
 
-工作区有无关修改或分支混有无关提交时，保留用户工作，使用基于最新 canonical base 的干净分支或 worktree。沿用本项目 `YYYY-MM-DD_short-title` 分支格式，不照搬 nodemgr 的 Helm 分支名。用户明确要求合并交付时按批准范围处理，不擅自拆分。
+保留工作区中的无关修改。发布分支基于最新 canonical base，命名为 `YYYY-MM-DD_short-title`。
 
 ## 3. 编写双语发布说明
 
@@ -53,15 +53,15 @@ description: Use when preparing a new opencode-acp release or checking/fixing pa
 
 先向用户展示发布说明草稿并确认，再写入最终版本路径。重要兼容性或升级事实不明时，单独报告给编写者；不要把未完成核实事项塞进 changelog。修正既有文件中的机械版本引用无需重启完整撰写流程。
 
-## 4. 验证对齐，不发明发布门槛
+## 4. 检查版本对齐
 
 - 检查三个 package 版本字段一致，tag 为 `v${package.version}`，符合版本规范。
 - 检查双语文件名、日期和版本行一致，安装示例指向目标 tag。
 - 审阅 `git diff` 与 `git diff --check`，确认没有无关字段、依赖或历史说明变更。
 - 根据改动运行已有 `npm run typecheck`、`npm run check:package` 与针对目标文件的格式检查。
-- 提交后运行 `bash scripts/ci/check-pr.sh <head-branch> <canonical-base-ref>`；该脚本读取 `BASE...HEAD` 的已提交差异，不能用未提交文件的结果冒充最终提交通过。
+- 提交后运行 `bash scripts/ci/check-pr.sh <head-branch> <canonical-base-ref>`，检查 `BASE...HEAD` 的版本和 changelog 差异。
 
-Release 工作流会再次校验 tag、lockfile 与双语说明，并负责正式构建和出包。本 skill 不新增校验脚本，不在发布准备中临时创建 API smoke、运行时 E2E 或本机正式发布产物。报告未运行的检查及其边界，不把旧提交或旧 CI 结果当作当前验证。
+Release 工作流负责 tag 校验、正式构建和出包。
 
 ## 5. 提交与 PR
 
@@ -73,14 +73,12 @@ chore: prepare v2.0.0-release.2 release --issue=#123
 
 默认 `Related: #123` 或 `refs #123`。仅当 Issue 真正完成且用户明确要求合并关闭时使用 closing keyword。
 
-分别确认推送、创建或修改 Issue、创建或修改 PR。发布准备或 PR 获批都不等于允许打 tag 或发布。不要从本机上传正式 Release 包，不执行 `npm publish`。
-
 ## 6. 合并后再打 tag
 
-参照 [tag workflow](references/tag-workflow.md) 和发布文档，确认最终已合入官方默认分支的发布提交，包括所有补漏提交。只有用户另行批准后才创建并推送 tag；GitHub Actions 负责构建和发布。
+参照 [tag workflow](references/tag-workflow.md)，对已合入官方默认分支的最终发布提交创建并推送附注 tag，由 GitHub Actions 构建和发布。
 
-`phase` 为 `release` 创建正式 GitHub Release，其他阶段为预发布。已经推送的 tag 不得自动移动、删除或强推。失败恢复不属于对齐补漏，应单独处理。
+`phase` 为 `release` 创建正式 GitHub Release，其他阶段为预发布。已发布 tag 的修复方式见[发布流程](../../../docs/developer/release.md#失败与重试)。
 
 ## 交付
 
-报告目标版本、模式、发布窗口、引用提交、改动字段、双语说明路径、检查结果、分支和提交。若涉及 PR，列出 Issue 关系与 PR base/head/URL；明确哪些远端操作已做、哪些尚未授权。不要把“对齐完成”说成“已发布”。
+报告目标版本、发布范围、双语说明路径、检查结果、提交和 PR 链接。

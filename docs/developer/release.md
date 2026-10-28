@@ -6,8 +6,6 @@ ACP 的构建与发布由 GitHub Actions 完成。维护者先准备发布提交
 
 ## 准备发布提交
 
-使用 coding agent 准备发布时，可使用项目的 `release-version-alignment` skill 对齐版本，使用 `changelog-doc` skill 整理双语发布说明，再由 `opencode-acp-create-github-pr` 处理 PR 交付。它们不会自动打 tag 或发布。
-
 1. 按[版本管理规范](../concepts/version_management.md)确定版本。将 `package.json` 的版本与 `package-lock.json` 中的两处版本号更新为目标版本。例如 `2.0.0-release.1` 对应 tag `v2.0.0-release.1`。
 2. 为每种语言各新增一份发布说明：
     - `support-files/changelog/en/v<version>_<YYYY-MM-DD>.md`
@@ -16,10 +14,10 @@ ACP 的构建与发布由 GitHub Actions 完成。维护者先准备发布提交
     每份文件必须包含 `Version: v<version>`。工作流要求每种语言恰好有一份匹配文件，并按先中文、后英文的顺序合并为 GitHub Release 说明。
 
 3. 按需更新 `README.md` 与发布说明中的安装示例和兼容性要求。
-4. 通过 PR 将发布提交合入 `master`，分支名遵循 `YYYY-MM-DD_short-title`。例如 `chore: prepare v2.0.0-release.1 GitHub release --issue=#19` 只描述发布准备；提交和 PR 标题都不会触发发布。
+4. 通过 PR 将发布提交合入 `master`，分支名遵循 `YYYY-MM-DD_short-title`。
 5. 等待 CI 通过后合并。CI 会检查 PR 约定、TypeScript 类型和打包结果。合并到 `master` 会再次运行 CI，但不会发布。
 
-被打 tag 的提交必须已包含当前的 Release 工作流，不要对仍带有旧发布流水线的提交打 tag。
+被打 tag 的提交必须包含 Release 工作流。
 
 ## 为已合并的提交打 tag
 
@@ -55,7 +53,7 @@ tag 触发后，工作流会依次执行：
 3. 使用 Node.js 22，通过 `npm ci --ignore-scripts` 安装依赖，并运行 `npm run typecheck` 与 `npm run check:package`。
 4. 构建后运行 `npm pack --ignore-scripts`。
 5. 为 tarball 生成 `SHA256SUMS`。
-6. 针对已存在的 tag 创建 GitHub Release，附带发布说明和两个产物。`phase` 为 `release` 时创建正式 Release（如 `v2.0.0-release.1`），其他阶段创建预发布（如 `v2.1.0-beta.1`）；不再按是否包含连字符判断。
+6. 针对已存在的 tag 创建 GitHub Release，附带发布说明和两个产物。`phase` 为 `release` 时创建正式 Release（如 `v2.0.0-release.1`），其他阶段创建预发布（如 `v2.1.0-beta.1`）。
 
 产物包括：
 

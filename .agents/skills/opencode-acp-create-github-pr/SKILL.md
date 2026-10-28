@@ -5,11 +5,11 @@ description: Use when preparing, creating, updating, replacing, or splitting a G
 
 # Create an opencode-acp Pull Request
 
-This is the repository-local PR delivery workflow, not a generic GitHub PR tutorial. It adapts the full PR safety and drafting workflow used by bk-nodemgr to the current `opencode-acp` repository. Read the repository-owned rules and current GitHub templates/workflows before drafting; do not assume that a remembered template, title rule, label, or branch convention is still current.
+Prepare and deliver pull requests for `opencode-acp`. Read the repository rules and current GitHub templates/workflows before drafting.
 
 This skill owns the agent execution flow and remote-write safety. It does not replace domain-specific investigation, code review, runtime verification, or release procedures.
 
-For release preparation and package/lock/changelog alignment, use `release-version-alignment` first. For bilingual release notes, use `changelog-doc`. Version naming lives in `docs/concepts/version_management.md`; maintainer steps live in `docs/developer/release.md`. These skills return here for Issue/PR delivery and do not authorize tagging or publishing.
+For release preparation and package/lock/changelog alignment, use `release-version-alignment`. For bilingual release notes, use `changelog-doc`. Version naming lives in `docs/concepts/version_management.md`; release steps live in `docs/developer/release.md`.
 
 ## Operating modes
 
