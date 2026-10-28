@@ -14,7 +14,7 @@ type UpdateResult =
     | { updated: false; error: "remove_failed"; name: string; current: string; latest: string }
     | { updated: false }
 
-const PACKAGE_NAME = "opencode-acp"
+const PACKAGE_NAME = "@infituit/opencode-acp"
 
 export interface AutoUpdateHost {
     notify(title: string, message: string): Promise<void>

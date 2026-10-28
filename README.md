@@ -2,28 +2,27 @@
 
 ACP 是 [OpenCode](https://opencode.ai) 的上下文管理插件。它向模型提供压缩、恢复、搜索摘要和查看上下文用量的工具，用摘要替换暂时不需要的历史内容。
 
-> **ACP 2.0 要求 OpenCode >=2.1.4 且 <3。** 本版本使用 V2 插件 API，不支持 OpenCode 1.x。本版本仅通过 GitHub 分发，未发布到 npm；`opencode-acp@stable` 和 `@latest` 不会安装本次发布的版本。
+> **ACP 2.0 要求 OpenCode >=2.1.4 且 <3。** 本版本使用 V2 插件 API，不支持 OpenCode 1.x。通过 GitHub Release 和 npm 包 `@infituit/opencode-acp` 分发；无 scope 的 `opencode-acp` 不是本项目发布的包。
 
 ## 安装
 
-需要 OpenCode **>=2.1.4 且 <3**、Git，以及用于构建包的 Node.js/npm。
-通过 GitHub release tag 全局安装：
+需要 OpenCode **>=2.1.4 且 <3**。通过 npm 包全局安装（已包含预构建代码，无需从 Git 构建）：
 
 ```bash
-opencode plugin add github:infituit/opencode-acp#v2.0.0-alpha.1
+opencode plugin add @infituit/opencode-acp@2.0.0-alpha.1
 ```
 
-或者在 `opencode.json(c)` 中添加固定到该 tag 的 Git 包：
+也可使用 `opencode plugin add @infituit/opencode-acp@alpha` 跟随 Alpha 渠道，或者在 `opencode.json(c)` 中添加固定版本：
 
 ```json
 {
     "$schema": "https://opencode.ai/config.json",
-    "plugins": ["github:infituit/opencode-acp#v2.0.0-alpha.1"]
+    "plugins": ["@infituit/opencode-acp@2.0.0-alpha.1"]
 }
 ```
 
-移除已有的 npm 或本地 ACP 插件项，避免重复加载。修改配置后执行 `/reload`，新建会话并运行 `/acp` 确认插件可用。
-GitHub 自动生成的源码归档不含 `dist/`。
+移除已有的 npm、Git 或本地 ACP 插件项，避免重复加载。修改配置后执行 `/reload`，新建会话并运行 `/acp` 确认插件可用。
+GitHub Release 仍保留预构建 tarball；Git tag 安装会从源码执行 `prepare` 构建，需要 Git 和 Node.js/npm。GitHub 自动生成的源码归档不含 `dist/`。
 
 > [!IMPORTANT]
 > **禁用 OpenCode 的内置自动压缩。** ACP 自行处理上下文管理，两者同时运行可能导致消息重新展开、压缩状态丢失。请在 `opencode.json` 中添加：

@@ -2,7 +2,7 @@
 
 ACP 的构建与发布由 GitHub Actions 完成。维护者先准备发布提交并合并到 `master`，再对该提交推送版本 tag，由 tag 触发 [Release 工作流](../../.github/workflows/release.yml)。
 
-发布仅通过 GitHub 分发。CI 与 Release 工作流都不会发布到 npm、修改包版本、创建发布提交或推送 tag。
+GitHub Release 是发布源。Release 创建并上传产物成功后，通过 `needs: release` 调用 [Publish npm 工作流](../../.github/workflows/npm-publish.yml)，将同一 tarball 发布为公开 npm 包 `@infituit/opencode-acp`，不重新构建。工作流不会修改包版本、创建发布提交或推送 tag。
 
 ## 准备发布提交
 
@@ -57,33 +57,50 @@ tag 触发后，工作流会依次执行：
 
 产物包括：
 
-- `opencode-acp-<version>.tgz`：npm 包格式、已包含预构建 `dist/` 的包；不打包运行时依赖。
+- `infituit-opencode-acp-<version>.tgz`：`@infituit/opencode-acp` 的 npm 包，已包含预构建 `dist/`；不打包运行时依赖。早期未使用 scope 的 GitHub Release 产物名为 `opencode-acp-<version>.tgz`，不能直接用于新的自动 npm 发布流程。
 - `SHA256SUMS`：该 tarball 的 SHA-256 校验和。
 
-发布使用仓库的 `GITHUB_TOKEN` 及 `contents: write` 权限，不需要 npm 令牌，也不依赖额外的发布 action。
+GitHub Release 使用仓库的 `GITHUB_TOKEN` 及 `contents: write` 权限。该令牌创建的 Release 不会再次触发 `release: published` 工作流，因此 npm 发布使用同一次运行中的可复用工作流调用，而不是监听 Release 事件。
+
+## npm 自动发布配置
+
+在 npm 的 `@infituit/opencode-acp` 包 Settings 中配置 **Trusted Publisher → GitHub Actions**：
+
+- Organization or user：`infituit`
+- Repository：`opencode-acp`
+- Workflow filename：`release.yml`（调用方工作流，不是 `npm-publish.yml`）
+- Environment name：留空
+- Allowed actions：启用直接 `npm publish`
+
+npm 以调用方工作流身份校验 OIDC。调用方与被调用方均授予发布 job `id-token: write`，仅允许官方仓库运行；无需配置 `NPM_TOKEN`。发布使用 GitHub-hosted runner、Node.js 22 和 npm 11，以满足 Trusted Publishing 的版本要求。新建的 Trusted Publisher 配置须在两天内完成首次成功发布，否则需要重新创建。
+
+Publish npm 工作流下载指定 Release 的 tarball 和 `SHA256SUMS`，验证校验和、包名及版本后执行 `npm publish --ignore-scripts --access public`。发布过程中不检出源码、不安装包依赖、不重新执行构建脚本。
+
+npm dist-tag 按版本中的 `phase` 选择：`release` → `latest`，其他阶段转为小写，例如 `alpha` → `alpha`、`beta` → `beta`。预发布不会更新 `latest`。已手动发布的 `2.0.0-alpha.1` 不会被覆盖；后续使用新版本和新 tag。
 
 ## 确认发布并安装
 
-在官方仓库的 **Actions** 页面查看 Release 运行结果，再打开对应的 GitHub Release，确认 tag、发布说明和两个产物。下载产物后可校验：
+在官方仓库的 **Actions** 页面确认 Release 和后续 npm 发布 job 均成功，再打开对应的 GitHub Release，确认 tag、发布说明和两个产物。下载产物后可校验：
 
 ```bash
 sha256sum -c SHA256SUMS
 ```
 
-常规安装前，请先移除旧的 ACP npm 或本地开发插件配置，避免重复加载，然后安装对应 tag：
+常规安装前，请先移除旧的 ACP npm、Git 或本地开发插件配置，避免重复加载，然后安装对应 npm 版本：
 
 ```bash
-opencode plugin add github:infituit/opencode-acp#v2.0.0-release.1
+opencode plugin add @infituit/opencode-acp@2.0.0-release.1
 ```
 
-该命令从 Git 安装，而不是使用 Release 中的 tarball。安装过程需要 Git 和 Node.js/npm，用于执行包的 `prepare` 构建；OpenCode 的 `plugin add` 不接受 tarball 目标。随后运行 `/reload`，开启新会话并使用 `/acp` 确认插件可用。跨不兼容版本升级前请备份现有状态；V1 的 JSON 状态不会因复制而迁移到 V2 存储。
+也可使用 `@alpha` 跟随 Alpha 渠道，或在正式版本发布后使用 `@latest`。npm 包包含预构建 `dist/`，安装时无需从 Git 源码构建。Git 安装方式仍保留，但会执行 `prepare` 构建；OpenCode 的 `plugin add` 不接受 tarball 目标。随后运行 `/reload`，开启新会话并使用 `/acp` 确认插件可用。跨不兼容版本升级前请备份现有状态；V1 的 JSON 状态不会因复制而迁移到 V2 存储。
 
 ## 失败与重试
 
 - 工作流在创建 Release 之前失败时，先查看失败步骤。若是临时性故障且未创建 Release 或草稿，可重新运行失败的工作流。
 - 若被打 tag 的源码需要修复，请合并一个带新版本号、对应发布说明的新发布提交，并使用新 tag。不要移动或强制推送已发布的版本 tag。
 - 创建 Release 与上传产物是分开的 API 请求。若发布中途失败，重试前先检查 GitHub Releases（包括草稿）。工作流不会覆盖已有 Release 或产物，维护者需要明确处理残留草稿；不要通过删除已发布的 Release 来重试。
-- tag 推送成功后，Git 源码即可被安装，早于 Release 构建完成。请等待发布成功后再对外宣布。
+- GitHub Release 已成功但 npm 发布失败时，修复 OIDC 配置或临时故障后，在该次 Release 运行中仅重新运行失败的 job。不要重新创建 Release 或移动 tag。npm 不允许重复发布相同包名和版本；如果版本已经存在，先核对实际发布结果，不要盲目重试。
+- tag 推送成功后，Git 源码即可被安装，早于 Release 构建完成。请等待 GitHub Release 与 npm 发布均成功后再对外宣布。
 
 ## 参考
 
@@ -91,3 +108,4 @@ opencode plugin add github:infituit/opencode-acp#v2.0.0-release.1
 - [从另一个工作流触发工作流](https://docs.github.com/en/actions/how-tos/writing-workflows/choosing-when-your-workflow-runs/triggering-a-workflow)
 - [GitHub CLI：`gh release create`](https://cli.github.com/manual/gh_release_create)
 - [OpenCode 插件安装](https://opencode.ai/v2/docs/plugins)
+- [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/)
