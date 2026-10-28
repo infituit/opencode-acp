@@ -100,3 +100,13 @@ jobs:
                       --verify-tag --title "$TAG" \
                       --notes-file "$RUNNER_TEMP/release-notes.md" \
                       "${args[@]}"
+
+    npm-publish:
+        needs: release
+        if: github.repository == 'infituit/opencode-acp'
+        permissions:
+            contents: read
+            id-token: write
+        uses: ./.github/workflows/npm-publish.yml
+        with:
+            tag: ${{ github.ref_name }}
