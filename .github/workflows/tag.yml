@@ -1,0 +1,102 @@
+name: Create Tag
+
+on:
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: "Release tag to create, e.g. v2.0.0-alpha.2"
+                required: true
+                type: string
+
+permissions:
+    contents: read
+
+concurrency:
+    group: create-tag
+    cancel-in-progress: false
+
+jobs:
+    tag:
+        if: github.repository == 'infituit/opencode-acp' && github.ref == 'refs/heads/master'
+        runs-on: ubuntu-latest
+        permissions:
+            actions: read
+            contents: write
+        steps:
+            # Checkout keeps GITHUB_TOKEN credentials for the final tag push.
+            - uses: actions/checkout@v4
+
+            - name: Check tag, version and release notes
+              env:
+                  TAG: ${{ inputs.tag }}
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  node --input-type=module <<'NODE'
+                  import { readFileSync, readdirSync } from "node:fs"
+
+                  const tag = process.env.TAG
+                  if (!/^v\d+\.\d+\.\d+-[a-zA-Z]+\.\d+(?:-[a-zA-Z0-9][a-zA-Z0-9.-]*)?$/.test(tag)) {
+                      throw new Error("Tag must match v{major}.{minor}.{patch}-{phase}.{serial}[-{mark}]")
+                  }
+
+                  const pkg = JSON.parse(readFileSync("package.json", "utf8"))
+                  const lock = JSON.parse(readFileSync("package-lock.json", "utf8"))
+                  if (tag !== `v${pkg.version}`) {
+                      throw new Error("Tag must match package.json version")
+                  }
+                  if (lock.version !== pkg.version || lock.packages[""].version !== pkg.version) {
+                      throw new Error("package-lock.json version must match package.json")
+                  }
+
+                  for (const lang of ["zh", "en"]) {
+                      const dir = `support-files/changelog/${lang}`
+                      const entries = readdirSync(dir).filter((name) =>
+                          name.startsWith(`v${pkg.version}_`) && name.endsWith(".md"),
+                      )
+                      if (entries.length !== 1) {
+                          throw new Error(`Expected exactly one ${lang} changelog for v${pkg.version}`)
+                      }
+                      if (!readFileSync(`${dir}/${entries[0]}`, "utf8").includes(`Version: v${pkg.version}`)) {
+                          throw new Error(`${lang} changelog must contain Version: v${pkg.version}`)
+                      }
+                  }
+                  NODE
+
+            - name: Check master head and CI
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  GH_REPO: ${{ github.repository }}
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  head="$(gh api "repos/$GH_REPO/commits/master" --jq .sha)"
+                  if [[ "$head" != "$GITHUB_SHA" ]]; then
+                      echo "master moved to $head; rerun this workflow" >&2
+                      exit 1
+                  fi
+                  conclusion="$(gh run list --workflow ci.yml --commit "$GITHUB_SHA" --event push --limit 1 --json conclusion --jq '.[0].conclusion // ""')"
+                  if [[ "$conclusion" != "success" ]]; then
+                      echo "CI has not succeeded for $GITHUB_SHA (conclusion: ${conclusion:-none})" >&2
+                      exit 1
+                  fi
+
+            - name: Create and push tag
+              env:
+                  TAG: ${{ inputs.tag }}
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  status=0
+                  git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null || status=$?
+                  if [[ "$status" == 0 ]]; then
+                      echo "Tag $TAG already exists" >&2
+                      exit 1
+                  elif [[ "$status" != 2 ]]; then
+                      echo "Unable to check remote tags" >&2
+                      exit "$status"
+                  fi
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git tag -a "$TAG" "$GITHUB_SHA" -m "ACP $TAG"
+                  git push origin "refs/tags/$TAG"
