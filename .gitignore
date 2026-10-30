@@ -34,15 +34,17 @@ __pycache__/
 *$py.class
 
 # Legacy generated prompt files
-lib/prompts/**/*.generated.ts
+src/prompts/**/*.generated.ts
 
 # Tests
 tests/results/
 notes/
 test-update.ts
 
-# Documentation (local development only, except release and version management)
+# Documentation (local development only, except published documentation)
 docs/*
+!docs/assets/
+!docs/paper/
 !docs/developer/
 docs/developer/*
 !docs/developer/release.md

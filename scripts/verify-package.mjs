@@ -25,6 +25,7 @@ const requiredTarballFiles = [
 
 const forbiddenTarballPatterns = [
     /^node_modules\//,
+    /^src\//,
     /^lib\//,
     /^index\.ts$/,
     /^tests\//,
@@ -163,7 +164,7 @@ function packageLooksCommonJs(pkg) {
 }
 
 function validateRuntimeImportGraph() {
-    const pending = [path.join(root, "index.ts")]
+    const pending = [path.join(root, "src/index.ts")]
     const seen = new Set()
 
     while (pending.length > 0) {

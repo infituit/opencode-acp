@@ -788,7 +788,7 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
 
             // Per-provider / per-model override validation (compress.providers,
             // issue #344). The override surface mirrors CompressModelOverrides in
-            // lib/config.ts: every `compress` field except the structural /
+            // src/config.ts: every `compress` field except the structural /
             // session-level ones (permission, the deprecated minContextLimit
             // family, the flat model*Limits maps, providers itself).
             type OverrideFieldType =

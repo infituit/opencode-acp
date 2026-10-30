@@ -34,7 +34,7 @@ The user may specify scope in either form:
 
 1. **Path form** (preferred):
 
-- Example: `lib/compress/`
+- Example: `src/compress/`
 
 2. **Natural language form** (must support):
 
@@ -151,7 +151,7 @@ If the user asks to “rewrite/compress” an existing `AGENTS.md` under a scope
 
 1. Path-based:
 
-- “为 `lib/compress/` 写一个 scoped AGENTS.md（压缩格式）”
+- “为 `src/compress/` 写一个 scoped AGENTS.md（压缩格式）”
 
 2. Natural language:
 
@@ -159,4 +159,4 @@ If the user asks to “rewrite/compress” an existing `AGENTS.md` under a scope
 
 3. Compress:
 
-- “把 `lib/messages/AGENTS.md` 改写成 pipe-index 压缩格式，并保留信息”
+- “把 `src/messages/AGENTS.md` 改写成 pipe-index 压缩格式，并保留信息”

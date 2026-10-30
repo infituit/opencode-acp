@@ -1,6 +1,5 @@
 # Source files (shipping dist/ only)
-index.ts
-lib/
+src/
 
 # Development
 node_modules/
@@ -9,7 +8,6 @@ scripts/
 .github/
 
 # Documentation (internal)
-VERIFICATION.md
 ANALYSIS.md
 docs/
 notes/

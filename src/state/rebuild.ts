@@ -306,7 +306,7 @@ export function restoreForkCompressionState(
 
 /**
  * Replay a single range-mode compress invocation.
- * Mirrors `createCompressRangeTool.execute` (lib/compress/range.ts):
+ * Mirrors `createCompressRangeTool.execute` (src/compress/range.ts):
  *   resolveRanges → filterProtectedToolMessages → per-entry block allocation.
  *
  * Returns the number of blocks created.
@@ -382,7 +382,7 @@ function rebuildRangeInvocation(
     return created
 }
 
-/** Mirrors `resolveMessage` (lib/compress/message-utils.ts) but skips invalid
+/** Mirrors `resolveMessage` (src/compress/message-utils.ts) but skips invalid
  *  entries gracefully instead of throwing. */
 function resolveMessageEntry(
     entry: CompressMessageEntry,

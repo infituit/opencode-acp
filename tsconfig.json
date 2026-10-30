@@ -9,7 +9,7 @@
         "allowJs": true,
         "checkJs": false,
         "outDir": "./dist",
-        "rootDir": ".",
+        "rootDir": "./src",
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
@@ -19,6 +19,6 @@
         "sourceMap": true,
         "types": ["node"]
     },
-    "include": ["index.ts", "lib/**/*"],
+    "include": ["src/**/*"],
     "exclude": ["node_modules", "dist", "logs"]
 }
