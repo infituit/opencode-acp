@@ -19,7 +19,6 @@ import {
     createSystemPromptHandler,
 } from "../hooks"
 import type { HostPermissionSnapshot } from "../host-permissions"
-import { detectBiliEnvYield } from "../bili-proxy"
 import { startAutoUpdate } from "../update"
 import { fetchV2SessionMessages, toV2RequestMessages } from "./messages"
 
@@ -113,10 +112,6 @@ export const AcpV2Plugin = Plugin.define({
         })
         if (!config.enabled) return
 
-        if (detectBiliEnvYield() !== null) {
-            return
-        }
-
         const logger = new Logger(config.debug, config.debug ? "debug" : config.logLevel)
         configureNativeStateStorage({
             get: (key) => ctx.storage.get(key),
@@ -194,8 +189,6 @@ export const AcpV2Plugin = Plugin.define({
         const transformSystem = createSystemPromptHandler(registry, logger, config, prompts)
 
         await ctx.session.hook("context", async (event) => {
-            if (detectBiliEnvYield() !== null) return
-
             const messages = await fetchV2SessionMessages(ctx, event.sessionID)
             if (messages.length === 0) return
 
