@@ -365,7 +365,7 @@ const defaultConfig: PluginConfig = {
     pruneNotification: "off",
     // [FIX #20] Default to toast — chat-mode notifications inject an empty
     // user message that freezes the session on providers that reject empty
-    // messages (zhipuai-lb code 1214). See lib/ui/notification.ts.
+    // messages (zhipuai-lb code 1214). See src/ui/notification.ts.
     pruneNotificationType: "toast",
     commands: {
         enabled: true,

@@ -1,8 +1,8 @@
 #!/usr/bin/env npx tsx
 
-import { Logger } from "../lib/logger"
-import { renderSystemPrompt } from "../lib/prompts"
-import { PromptStore, PROMPT_KEYS, type PromptKey, type RuntimePrompts } from "../lib/prompts/store"
+import { Logger } from "../src/logger"
+import { renderSystemPrompt } from "../src/prompts"
+import { PromptStore, PROMPT_KEYS, type PromptKey, type RuntimePrompts } from "../src/prompts/store"
 
 function normalizePromptKey(value: string): PromptKey | null {
     const normalized = value.trim().toLowerCase()

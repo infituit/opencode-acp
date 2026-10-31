@@ -10,7 +10,7 @@ function isLiveBlock(block: CompressionBlock): boolean {
 
 /**
  * Blocks record the same `startId`/`endId` refs as the `content[]` entry that
- * created them (see `lib/compress/range.ts`), so this pair maps an entry to its
+ * created them (see `src/compress/range.ts`), so this pair maps an entry to its
  * block within a batched call.
  */
 function rangeKey(startId: string, endId: string): string {

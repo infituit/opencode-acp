@@ -91,7 +91,7 @@ ACP 使用自己的配置文件，按以下顺序加载：
 
 每一层覆盖前一层，因此项目设置优先于全局设置。修改 ACP 配置后请重启 OpenCode。
 
-完整字段结构见 [`acp.schema.json`](./acp.schema.json)，默认值见 [`lib/config.ts`](./lib/config.ts) 中的 `defaultConfig`。不需要在配置文件中复制所有默认值，只填写需要覆盖的字段。
+完整字段结构见 [`acp.schema.json`](./acp.schema.json)，默认值见 [`src/config.ts`](./src/config.ts) 中的 `defaultConfig`。不需要在配置文件中复制所有默认值，只填写需要覆盖的字段。
 
 ### 配置示例
 

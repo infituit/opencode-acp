@@ -1,32 +1,28 @@
-# ACP CLI
+# ACP Prompt Preview
 
-Dev tool for previewing prompt outputs.
-
-## Usage
+Preview the bundled ACP prompts from the repository root:
 
 ```bash
-bun run acp [TYPE]
+npm run acp -- --help
+npm run acp -- --list
+npm run acp -- --show compress-range
+npm run acp -- --system
 ```
 
-## Types
+## Options
 
-| Flag                 | Description                              |
-| -------------------- | ---------------------------------------- |
-| `--system`           | System prompt                            |
-| `--nudge`            | Standard nudge prompt                    |
-| `--compress-nudge`   | Context-limit compress nudge             |
-| `--context-tools`    | Example `<context-pressure-tools>` block |
-| `--compress-context` | Example `<compress-context>` block       |
-| `--cooldown`         | Cooldown context-info block              |
+| Option         | Output                                    |
+| -------------- | ----------------------------------------- |
+| `--list`       | Available prompt keys                     |
+| `--show <key>` | Prompt text for the selected key          |
+| `--system`     | System prompt with the default extensions |
 
-## Examples
+Running without options also prints the system prompt. Use `--list` for the keys supported by the current prompt store:
 
-```bash
-bun run acp --system
-bun run acp --nudge
-bun run acp --context-tools
-```
+- `system`
+- `compress-range`
+- `context-limit-nudge`
+- `turn-nudge`
+- `iteration-nudge`
 
-## Purpose
-
-This CLI does not ship with the plugin. It is for local DX while iterating on injected prompts.
+The preview uses the bundled defaults; it does not load ACP configuration or enable custom prompt overrides. It does not start OpenCode and is not runtime verification of the plugin. This development tool is not included in the published package.
