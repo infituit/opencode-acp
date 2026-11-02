@@ -9,6 +9,7 @@ import {
     createSearchContextToolV2,
 } from "../compress"
 import { Logger } from "../logger"
+import { diagnoseContext } from "../diagnostics"
 import { SessionStateRegistry } from "../state"
 import { configureNativeStateStorage } from "../state/persistence"
 import { PromptStore } from "../prompts/store"
@@ -189,35 +190,50 @@ export const AcpV2Plugin = Plugin.define({
         const transformSystem = createSystemPromptHandler(registry, logger, config, prompts)
 
         await ctx.session.hook("context", async (event) => {
-            const messages = await fetchV2SessionMessages(ctx, event.sessionID)
-            if (messages.length === 0) return
-
-            const lastUser = [...messages].reverse().find((message) => message.info.role === "user")
-            if (lastUser?.info.role === "user") {
-                lastUser.info.agent = event.agent
-                lastUser.info.model = {
-                    providerID: event.model.providerID,
-                    modelID: event.model.id,
+            await diagnoseContext(logger, event.sessionID, async (diagnostic) => {
+                const timeline = diagnostic?.timeline("context", "fetchSessionMessages")
+                const checkpoint = (stage: string) => timeline?.next(stage)
+                const messages = await fetchV2SessionMessages(ctx, event.sessionID)
+                checkpoint("prepareMessages")
+                if (diagnostic) diagnostic.counts.inputMessages = messages.length
+                if (messages.length === 0) {
+                    diagnostic?.skip("empty_history")
+                    return
                 }
-                lastUser.info.providerID = event.model.providerID
-                lastUser.info.modelID = event.model.id
-            }
 
-            const output = { messages }
-            await transformMessages({}, output)
-            event.messages = toV2RequestMessages(output.messages) as typeof event.messages
+                const lastUser = [...messages]
+                    .reverse()
+                    .find((message) => message.info.role === "user")
+                if (lastUser?.info.role === "user") {
+                    lastUser.info.agent = event.agent
+                    lastUser.info.model = {
+                        providerID: event.model.providerID,
+                        modelID: event.model.id,
+                    }
+                    lastUser.info.providerID = event.model.providerID
+                    lastUser.info.modelID = event.model.id
+                }
 
-            const systemOutput = {
-                system: event.system.map((part) => part.text),
-            }
-            await transformSystem(
-                {
-                    sessionID: event.sessionID,
-                    model: asV2Model(event.model),
-                },
-                systemOutput,
-            )
-            event.system = systemOutput.system.map((text) => ({ type: "text", text }))
+                const output = { messages }
+                checkpoint("transformMessages")
+                await transformMessages({}, output)
+                if (diagnostic) diagnostic.counts.outputMessages = output.messages.length
+                checkpoint("convertRequestMessages")
+                event.messages = toV2RequestMessages(output.messages) as typeof event.messages
+                checkpoint("transformSystem")
+
+                const systemOutput = {
+                    system: event.system.map((part) => part.text),
+                }
+                await transformSystem(
+                    {
+                        sessionID: event.sessionID,
+                        model: asV2Model(event.model),
+                    },
+                    systemOutput,
+                )
+                event.system = systemOutput.system.map((text) => ({ type: "text", text }))
+            })
         })
 
         const abort = new AbortController()

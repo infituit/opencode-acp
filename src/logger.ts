@@ -109,16 +109,23 @@ export class Logger {
         }
     }
 
-    private async write(level: string, component: string, message: string, data?: unknown) {
+    private async write(
+        level: string,
+        component: string,
+        message: string,
+        data?: unknown,
+        structured = false,
+    ) {
         // Levels below the resolved verbosity are dropped here; WARN/ERROR
         // still land by default because the production default is `info`.
         if (!this.shouldWrite(level.toLowerCase() as LogLevel)) return
 
+        // Capture call time, not the continuation time after synchronous hook work.
+        const timestamp = new Date().toISOString()
         try {
             await this.ensureLogDir()
 
-            const timestamp = new Date().toISOString()
-            const dataStr = this.formatData(data)
+            const dataStr = structured ? JSON.stringify(data) : this.formatData(data)
 
             const logLine = `${timestamp} ${level.padEnd(5)} ${component}: ${message}${dataStr ? " | " + dataStr : ""} | v=${LOG_VERSION}\n`
 
@@ -127,9 +134,20 @@ export class Logger {
                 await mkdir(dailyLogDir, { recursive: true })
             }
 
-            const logFile = join(dailyLogDir, `${new Date().toISOString().split("T")[0]}.log`)
+            const logFile = join(dailyLogDir, `${timestamp.split("T")[0]}.log`)
             await writeFile(logFile, logLine, { flag: "a" })
         } catch (error) {}
+    }
+
+    /** One JSON payload on the existing daily sink; ordinary log formatting is unchanged. */
+    diagnostic(event: "context", data: object, level: "info" | "error" = "info") {
+        return this.write(
+            level.toUpperCase(),
+            "diagnostics",
+            event,
+            { ...data, version: LOG_VERSION },
+            true,
+        )
     }
 
     info(message: string, data?: unknown) {
