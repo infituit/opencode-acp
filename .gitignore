@@ -48,6 +48,7 @@ docs/*
 !docs/developer/
 docs/developer/*
 !docs/developer/release.md
+!docs/developer/v2-boundary.md
 !docs/concepts/
 docs/concepts/*
 !docs/concepts/version_management.md
