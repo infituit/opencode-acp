@@ -10,6 +10,7 @@
 |Where to look:package verification:scripts/verify-package.mjs|prompt preview:scripts/print.ts,scripts/README.md|user docs:README.md,acp.schema.json|research:docs/paper|images:docs/assets|release:docs/developer/release.md,support-files/changelog
 |Architecture:OpenCode V2→src/index.ts→AcpV2Plugin.setup→context hook and tool/command transforms→message conversion, pruning and prompt injection→compress/decompress→per-session state persisted via ctx.storage
 |Architecture:compression pipeline:{raw messages→T1 capture→T2 distill→T3 condense}|GC is a last-resort safety net, not the primary context strategy
+|V2 convergence:docs/developer/v2-boundary.md|target:src/v2 owns host integration and request orchestration;capability algorithms stay outside|hooks target:src/v2/hooks.ts,src/v2/hooks/|converge incrementally in separately scoped rounds;target layout is not current-state evidence
 |State:session state is per-session and persisted under OpenCode data storage|message refs and compression block IDs are compatibility-sensitive
 |Config:ACP-owned acp.json(c):global→OPENCODE_CONFIG_DIR→project .opencode|later layers override earlier layers|loaded in plugin setup; restart OpenCode after ACP config changes|do not infer OpenCode config reload behavior from ACP config
 |Compatibility:opencode-acp 2.x targets OpenCode >=2.1.4 <3 and the V2 plugin API|do not add OpenCode 1.x compatibility paths, dual entries, or legacy-state adapters unless the request explicitly changes this contract|treat V1 docs and code paths as migration input only
