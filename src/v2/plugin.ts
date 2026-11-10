@@ -18,7 +18,7 @@ import {
     createCommandExecuteHandler,
     createEventHandler,
     createSystemPromptHandler,
-} from "../hooks"
+} from "./hooks"
 import type { HostPermissionSnapshot } from "../host-permissions"
 import { startAutoUpdate } from "../update"
 import { fetchV2SessionMessages, toV2RequestMessages } from "./messages"

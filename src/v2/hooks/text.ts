@@ -1,6 +1,6 @@
-import type { Logger } from "../logger"
-import { stripHallucinationsFromString, stripLeakedTrailingRefs } from "../messages"
-import type { SessionStateRegistry } from "../state"
+import type { Logger } from "../../logger"
+import { stripHallucinationsFromString, stripLeakedTrailingRefs } from "../../messages"
+import type { SessionStateRegistry } from "../../state"
 
 export function createTextCompleteHandler(registry: SessionStateRegistry, logger: Logger) {
     return async (

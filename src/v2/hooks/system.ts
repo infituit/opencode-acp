@@ -1,9 +1,9 @@
-import type { Logger } from "../logger"
-import type { PluginConfig } from "../config"
-import { renderSystemPrompt, type PromptStore } from "../prompts"
-import { buildProtectedToolsExtension } from "../prompts/extensions/system"
-import { compressPermission } from "../compress-permission"
-import { saveSessionState, type SessionStateRegistry } from "../state"
+import type { Logger } from "../../logger"
+import type { PluginConfig } from "../../config"
+import { renderSystemPrompt, type PromptStore } from "../../prompts"
+import { buildProtectedToolsExtension } from "../../prompts/extensions/system"
+import { compressPermission } from "../../compress-permission"
+import { saveSessionState, type SessionStateRegistry } from "../../state"
 
 const INTERNAL_AGENT_SIGNATURES = [
     "You are a title generator",

@@ -5,7 +5,7 @@
 |Scope:repo-root
 |Overview:opencode-acp is a TypeScript ESM OpenCode V2 server plugin for model-driven Active Context Pruning|package:@infituit/opencode-acp|runtime:Node.js|package-manager:npm
 |Structure:./:{src,scripts,docs,support-files,.agents,.github,package.json,tsconfig.json,tsup.config.ts,acp.schema.json}
-|Where to look:plugin entry:src/index.ts→src/v2/plugin.ts|V2 message conversion:src/v2/messages.ts|hook handlers:src/hooks.ts|configuration:src/config.ts,src/config-validation.ts|logging:src/logger.ts
+|Where to look:plugin entry:src/index.ts→src/v2/plugin.ts|V2 message conversion:src/v2/messages.ts|hook handlers:src/v2/hooks.ts,src/v2/hooks/|configuration:src/config.ts,src/config-validation.ts|logging:src/logger.ts
 |Where to look:compression:src/compress|message pipeline:src/messages|session state:src/state|prompt rendering:src/prompts|slash commands:src/commands|GC:src/gc
 |Where to look:package verification:scripts/verify-package.mjs|prompt preview:scripts/print.ts,scripts/README.md|user docs:README.md,acp.schema.json|research:docs/paper|images:docs/assets|release:docs/developer/release.md,support-files/changelog
 |Architecture:OpenCode V2→src/index.ts→AcpV2Plugin.setup→context hook and tool/command transforms→message conversion, pruning and prompt injection→compress/decompress→per-session state persisted via ctx.storage

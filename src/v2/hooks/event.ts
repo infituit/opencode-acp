@@ -1,11 +1,11 @@
-import type { Logger } from "../logger"
+import type { Logger } from "../../logger"
 import {
     applyPendingCompressionDurations,
     buildCompressionTimingKey,
     resolveCompressionDuration,
-} from "../compress/timing"
-import { saveSessionState, type SessionStateRegistry } from "../state"
-import { clearSmartPlanSession } from "../compress/smart-plan"
+} from "../../compress/timing"
+import { saveSessionState, type SessionStateRegistry } from "../../state"
+import { clearSmartPlanSession } from "../../compress/smart-plan"
 
 export function createEventHandler(registry: SessionStateRegistry, logger: Logger) {
     return async (input: { event: any }) => {

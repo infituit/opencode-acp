@@ -9,7 +9,7 @@ import {
     createEventHandler,
     createSystemPromptHandler,
     createTextCompleteHandler,
-} from "../src/hooks"
+} from "../src/v2/hooks"
 import { getConfig } from "../src/config"
 import { Logger } from "../src/logger"
 import { PromptStore } from "../src/prompts/store"
