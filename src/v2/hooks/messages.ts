@@ -1,7 +1,7 @@
-import type { SessionState, WithParts } from "../state"
-import type { Logger } from "../logger"
-import type { PluginConfig } from "../config"
-import { assignMessageRefs } from "../message-ids"
+import type { SessionState, WithParts } from "../../state"
+import type { Logger } from "../../logger"
+import type { PluginConfig } from "../../config"
+import { assignMessageRefs } from "../../message-ids"
 import {
     buildPriorityMap,
     buildToolIdList,
@@ -13,39 +13,39 @@ import {
     stripHallucinations,
     stripStaleMetadata,
     syncCompressionBlocks,
-} from "../messages"
-import { applyCompressOverrides } from "../messages/inject/utils"
-import type { PromptStore } from "../prompts"
-import { DEFAULT_COMPRESS_IMAGES, DEFAULT_COMPRESS_REASONING } from "../config"
-import { archiveSessionImages, pruneImageArchive } from "../compress/image-archive"
-import { filterMessagesInPlace } from "../messages/shape"
-import { getLastUserMessage, isSyntheticMessage } from "../messages/query"
-import { OUTPUT_RESERVE_TOKENS, truncateLargeToolOutputs } from "../messages/truncate-tools"
+} from "../../messages"
+import { applyCompressOverrides } from "../../messages/inject/utils"
+import type { PromptStore } from "../../prompts"
+import { DEFAULT_COMPRESS_IMAGES, DEFAULT_COMPRESS_REASONING } from "../../config"
+import { archiveSessionImages, pruneImageArchive } from "../../compress/image-archive"
+import { filterMessagesInPlace } from "../../messages/shape"
+import { getLastUserMessage, isSyntheticMessage } from "../../messages/query"
+import { OUTPUT_RESERVE_TOKENS, truncateLargeToolOutputs } from "../../messages/truncate-tools"
 import {
     applyStickyTruncations,
     recordStickyTruncations,
     snapshotToolOutputs,
-} from "../messages/sticky-truncation"
-import { resolveEffectiveContextLimit } from "../state/utils"
-import { enforceContextBudget } from "../messages/enforce-budget"
-import { type HostPermissionSnapshot } from "../host-permissions"
-import { syncCompressPermissionState } from "../compress-permission"
-import { hideConsumedCompressCalls } from "../compress/hide-consumed"
-import { hideFailedCompressCalls } from "../compress/hide-failed"
-import { applyMessageFilters } from "../messages/filter/apply"
-import { ensureBuiltinFiltersRegistered } from "../messages/filter/builtin"
+} from "../../messages/sticky-truncation"
+import { resolveEffectiveContextLimit } from "../../state/utils"
+import { enforceContextBudget } from "../../messages/enforce-budget"
+import { type HostPermissionSnapshot } from "../../host-permissions"
+import { syncCompressPermissionState } from "../../compress-permission"
+import { hideConsumedCompressCalls } from "../../compress/hide-consumed"
+import { hideFailedCompressCalls } from "../../compress/hide-failed"
+import { applyMessageFilters } from "../../messages/filter/apply"
+import { ensureBuiltinFiltersRegistered } from "../../messages/filter/builtin"
 import {
     createSessionState,
     saveSessionState,
     syncToolCache,
     updatePerTurnState,
     type SessionStateRegistry,
-} from "../state"
-import { cacheSystemPromptTokens } from "../ui/utils"
-import { runBatchCleanup } from "../gc/merge"
-import { getCurrentTokenUsage } from "../token-utils"
-import { currentDiagnostic } from "../diagnostics"
-import { recordVisibleMessages } from "../compress/smart-plan"
+} from "../../state"
+import { cacheSystemPromptTokens } from "../../ui/utils"
+import { runBatchCleanup } from "../../gc/merge"
+import { getCurrentTokenUsage } from "../../token-utils"
+import { currentDiagnostic } from "../../diagnostics"
+import { recordVisibleMessages } from "../../compress/smart-plan"
 
 // [FIX Bug 37] OpenCode built-in hidden primary-mode agents that must NOT be
 // run through the message-transform pipeline. These small internal LLM

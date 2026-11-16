@@ -1,12 +1,12 @@
-import type { Logger } from "../logger"
-import type { PluginConfig } from "../config"
-import type { SessionStateRegistry } from "../state"
-import { handleContextCommand, handleStatsCommand } from "../commands"
-import { handleExportCommand } from "../commands/export"
-import { sendIgnoredMessage } from "../ui/notification"
-import type { HostPermissionSnapshot } from "../host-permissions"
-import { syncCompressPermissionState } from "../compress-permission"
-import { fetchSessionMessages } from "../compress/search"
+import type { Logger } from "../../logger"
+import type { PluginConfig } from "../../config"
+import type { SessionStateRegistry } from "../../state"
+import { handleContextCommand, handleStatsCommand } from "../../commands"
+import { handleExportCommand } from "../../commands/export"
+import { sendIgnoredMessage } from "../../ui/notification"
+import type { HostPermissionSnapshot } from "../../host-permissions"
+import { syncCompressPermissionState } from "../../compress-permission"
+import { fetchSessionMessages } from "../../compress/search"
 
 function buildHelpText(): string {
     return [
