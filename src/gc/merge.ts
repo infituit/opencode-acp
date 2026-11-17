@@ -196,6 +196,7 @@ export function runBatchCleanup(
     config: PluginConfig,
     logger: Logger,
     messages: WithParts[],
+    prePruneTokens?: number,
 ): BatchCleanupResult {
     const noop: BatchCleanupResult = {
         tier: 0,
@@ -211,7 +212,7 @@ export function runBatchCleanup(
         return noop
     }
 
-    const currentTokens = getCurrentTokenUsage(state, messages)
+    const currentTokens = prePruneTokens ?? getCurrentTokenUsage(state, messages)
 
     // Only a hardcoded 100% force fallback remains. The mark_block mechanism and
     // the multi-tier (low/high/force) batch-cleanup were retired; full GC removal

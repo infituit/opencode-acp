@@ -2,9 +2,12 @@ import { SessionState, WithParts } from "./state"
 import type { AssistantMessage, UserMessage } from "./state/message-types"
 import { Logger } from "./logger"
 import * as _anthropicTokenizer from "@anthropic-ai/tokenizer"
-const anthropicCountTokens = (_anthropicTokenizer.countTokens ??
-    (_anthropicTokenizer as any).default?.countTokens) as typeof _anthropicTokenizer.countTokens
+const getAnthropicTokenizer = (_anthropicTokenizer.getTokenizer ??
+    (_anthropicTokenizer as any).default?.getTokenizer) as typeof _anthropicTokenizer.getTokenizer
 import { getLastUserMessage } from "./messages/query"
+
+// The convenience countTokens API constructs and frees a WASM tokenizer per call.
+let tokenizer: ReturnType<typeof getAnthropicTokenizer> | undefined
 
 export function getCurrentTokenUsage(state: SessionState, messages: WithParts[]): number {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -127,8 +130,15 @@ export function getCurrentParams(
 export function countTokens(text: string): number {
     if (!text) return 0
     try {
-        return anthropicCountTokens(text)
+        tokenizer ??= getAnthropicTokenizer()
+        return tokenizer.encode(text.normalize("NFKC"), "all").length
     } catch {
+        try {
+            tokenizer?.free()
+        } catch {
+            // Disposal must not prevent the existing approximate fallback.
+        }
+        tokenizer = undefined
         return Math.round(text.length / 4)
     }
 }

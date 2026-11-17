@@ -283,14 +283,21 @@ export function createChatMessageTransformHandler(
                 // [FIX Bug 4]
                 saveSessionState(state, logger).catch(() => {}) // [FIX Bug 4] persist deactivations
             }
-            checkpoint("batchCleanup")
+            checkpoint("prePruneTokens")
             buildToolIdList(state, output.messages)
-            const batchResult = runBatchCleanup(state, config, logger, output.messages)
+            const prePruneTokens = getCurrentTokenUsage(state, output.messages)
+            checkpoint("batchCleanup")
+            // Cleanup changes block metadata, not the message projection being counted.
+            const batchResult = runBatchCleanup(
+                state,
+                config,
+                logger,
+                output.messages,
+                prePruneTokens,
+            )
             if (batchResult.mergedCount > 0) {
                 saveSessionState(state, logger).catch(() => {})
             }
-            checkpoint("prePruneTokens")
-            const prePruneTokens = getCurrentTokenUsage(state, output.messages)
             checkpoint("prune")
             // Keep the full post-filter projection for candidate planning. The
             // nudge receives a pruned view, while range validation still needs the
