@@ -1,18 +1,13 @@
 /**
  * [FIX #312] Catalog of per-model context limits, keyed `${providerID}/${modelID}`.
  *
- * Within one LLM request the host fires experimental.chat.messages.transform
- * BEFORE experimental.chat.system.transform (sst/opencode: session/prompt.ts
- * triggers messages.transform, then llm/request.ts triggers system.transform
- * during handle.process). state.modelContextLimit is written only by the
- * system hook, so on the first request after a model switch every percentage
- * threshold (emergencyThresholdPercent, min/maxContextLimit "%", GC tiers) is
- * still computed against the PREVIOUS model's
- * limit. This catalog lets the messages hook reconcile against the model
- * named on the request's user message instead of waiting one turn.
+ * The V2 context hook transforms messages before the system prompt. This
+ * catalog lets the messages handler reconcile state.modelContextLimit against
+ * the model named on the request's user message before percentage thresholds
+ * (emergencyThresholdPercent, min/maxContextLimit "%", GC tiers) are computed.
  *
- * Entries are recorded live by the system hook every request and seeded once
- * at plugin init from the host's /config/providers catalog.
+ * Entries are seeded at plugin init from the V2 model catalog and resolved
+ * again on a request-time miss through the registry's existing lazy hydration.
  *
  * Standalone factory (not embedded in SessionStateRegistry) so the test
  * registry stub can compose the SAME implementation instead of hand-rolling
@@ -46,11 +41,13 @@ export function createModelLimitCatalog(): ModelLimitCatalog {
         async hydrateFromClient(client: unknown): Promise<number> {
             try {
                 const v2Client = client as {
-                    model?: { list?: () => Promise<ReadonlyArray<unknown>> }
+                    model?: { list?: () => Promise<{ data: ReadonlyArray<unknown> }> }
                 }
-                const models = await v2Client.model!.list!()
+                const response = await v2Client.model!.list!()
+                if (!Array.isArray(response.data)) return 0
                 let recorded = 0
-                for (const value of models) {
+                for (const value of response.data) {
+                    if (!value || typeof value !== "object") continue
                     const model = value as {
                         providerID?: unknown
                         id?: unknown

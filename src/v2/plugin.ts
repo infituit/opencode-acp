@@ -61,14 +61,6 @@ async function notifySession(ctx: Context, title: string, message: string): Prom
     }
 }
 
-function asV2Model(model: { providerID: string; id: string }) {
-    return {
-        id: model.id,
-        providerID: model.providerID,
-        limit: { context: 0 },
-    }
-}
-
 async function registerTools(
     ctx: Context,
     config: ReturnType<typeof getConfig>,
@@ -228,7 +220,16 @@ export const AcpV2Plugin = Plugin.define({
                 await transformSystem(
                     {
                         sessionID: event.sessionID,
-                        model: asV2Model(event.model),
+                        model: {
+                            ...event.model,
+                            limit: {
+                                context:
+                                    registry.resolveModelLimit(
+                                        event.model.providerID,
+                                        event.model.id,
+                                    ) ?? 0,
+                            },
+                        },
                     },
                     systemOutput,
                 )
