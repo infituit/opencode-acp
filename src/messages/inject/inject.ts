@@ -5,7 +5,7 @@ import type { RuntimePrompts } from "../../prompts/store"
 import { formatMessageIdTag, formatTokenSize, classifyMessageType } from "../../message-ids"
 import type { CompressionPriorityMap } from "../priority"
 import { compressPermission } from "../../compress-permission"
-import { countMessageCharacters } from "../../token-utils"
+import { countMessageCharacters } from "../../context-usage"
 import {
     getLastUserMessage,
     isIgnoredUserMessage,

@@ -1,7 +1,7 @@
 import type { Logger } from "../logger"
 import type { CompressionBlock, SessionState } from "../state"
 import type { PluginConfig } from "../config"
-import { countMessageCharacters } from "../token-utils"
+import { countMessageCharacters } from "../context-usage"
 import {
     filterLastUserMessage,
     filterProtectedRecentMessages,

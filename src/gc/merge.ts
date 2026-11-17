@@ -1,7 +1,7 @@
 import type { CompressionBlock, SessionState, WithParts } from "../state"
 import type { PluginConfig } from "../config"
 import type { Logger } from "../logger"
-import { countTokens, getCurrentTokenUsage } from "../token-utils"
+import { countTokens, getCurrentTokenUsage } from "../context-usage"
 import { resolveEffectiveContextLimit } from "../state/utils"
 import { bumpPruneStructureVersion } from "../state/utils"
 import {

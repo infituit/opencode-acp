@@ -3,7 +3,7 @@ import type {
     ToolContext as V2ToolContext,
 } from "@opencode/plugin/promise/tool"
 import { type ToolFactoryContext, resolveToolContext } from "./types"
-import { countTokens } from "../token-utils"
+import { countTokens } from "../context-usage"
 import { RANGE_FORMAT_EXTENSION } from "../prompts/extensions/tool"
 import {
     finalizeSession,

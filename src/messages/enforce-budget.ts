@@ -8,7 +8,7 @@ import {
     countTokens,
     extractCompletedToolOutput,
     getCurrentTokenUsage,
-} from "../token-utils"
+} from "../context-usage"
 
 /**
  * Default completion reserve in tokens. opencode falls back to max_tokens=32000

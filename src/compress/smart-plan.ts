@@ -1,5 +1,5 @@
 import type { CompressibleRange } from "../messages/inject/utils"
-import { countMessageCharacters } from "../token-utils"
+import { countMessageCharacters } from "../context-usage"
 import type { ToolContext, SearchContext } from "./types"
 
 type SmartPlanContext = Pick<ToolContext, "state" | "logger" | "config">

@@ -25,7 +25,7 @@ import {
 } from "../messages/inject/candidates"
 import { buildSearchContext, fetchSessionMessages } from "./search"
 import { hideConsumedCompressCalls } from "./hide-consumed"
-import { estimateSystemPromptTokens } from "../token-utils"
+import { estimateSystemPromptTokens } from "../context-usage"
 import { armBestSmartPlan, clearSmartPlan, getVisibleMessageIds } from "./smart-plan"
 import { assignMessageRefs, repairNonMonotonicMessageRefs } from "../message-ids"
 import { saveSessionState } from "../state"

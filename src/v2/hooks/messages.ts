@@ -37,13 +37,12 @@ import { ensureBuiltinFiltersRegistered } from "../../messages/filter/builtin"
 import {
     createSessionState,
     saveSessionState,
-    syncToolCache,
     updatePerTurnState,
     type SessionStateRegistry,
 } from "../../state"
 import { cacheSystemPromptTokens } from "../../ui/utils"
 import { runBatchCleanup } from "../../gc/merge"
-import { getCurrentTokenUsage } from "../../token-utils"
+import { getCurrentTokenUsage } from "../../context-usage"
 import { currentDiagnostic } from "../../diagnostics"
 import { recordVisibleMessages } from "../../compress/smart-plan"
 
@@ -284,8 +283,6 @@ export function createChatMessageTransformHandler(
                 // [FIX Bug 4]
                 saveSessionState(state, logger).catch(() => {}) // [FIX Bug 4] persist deactivations
             }
-            checkpoint("syncToolCache")
-            syncToolCache(state, config, logger, output.messages)
             checkpoint("batchCleanup")
             buildToolIdList(state, output.messages)
             const batchResult = runBatchCleanup(state, config, logger, output.messages)

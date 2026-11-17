@@ -46,7 +46,7 @@ import { sendIgnoredMessage } from "../ui/notification"
 import { formatTokenCount } from "../ui/utils"
 import { isIgnoredUserMessage } from "../messages/query"
 import { isMessageCompacted } from "../state/utils"
-import { countTokens, extractCompletedToolOutput, getCurrentParams } from "../token-utils"
+import { countTokens, extractCompletedToolOutput, getCurrentParams } from "../context-usage"
 import type { AssistantMessage, TextPart, ToolPart } from "../state/message-types"
 
 export interface ContextCommandContext {

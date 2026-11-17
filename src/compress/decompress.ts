@@ -10,7 +10,7 @@ import { ensureSessionInitialized } from "../state"
 import { saveSessionState } from "../state/persistence"
 import { assignMessageRefs } from "../message-ids"
 import { syncCompressionBlocks } from "../messages"
-import { getCurrentTokenUsage, extractToolContent } from "../token-utils"
+import { getCurrentTokenUsage, extractToolContent } from "../context-usage"
 import { resolveEffectiveContextLimit } from "../state/utils"
 import {
     fetchSessionMessages,

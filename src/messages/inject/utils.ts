@@ -22,7 +22,7 @@ import {
     countMessageCharacters,
     estimateSystemPromptTokens,
     getCurrentTokenUsage,
-} from "../../token-utils"
+} from "../../context-usage"
 import {
     appendToTextPart,
     appendToLastTextPart,
@@ -701,7 +701,7 @@ export function estimateContextComposition(
                 toolTypeMap.set(toolName, (toolTypeMap.get(toolName) || 0) + toolPartTokens)
                 if (!msgToolName) msgToolName = toolName
             } else if (part.type === "reasoning" && typeof (part as any).text === "string") {
-                // Real usage includes reasoning (token-utils.ts) — track as its own
+                // Real usage includes reasoning (context-usage.ts) — track as its own
                 // category so display totals align with the usage formula (#371).
                 const tokens = Math.round(((part as any).text as string).length / 4)
                 msgTotal += tokens
