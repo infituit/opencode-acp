@@ -6,17 +6,6 @@ export interface WithParts {
     parts: Part[]
 }
 
-export type ToolStatus = "pending" | "running" | "completed" | "error"
-
-export interface ToolParameterEntry {
-    tool: string
-    parameters: any
-    status?: ToolStatus
-    error?: string
-    turn: number
-    tokenCount?: number
-}
-
 export interface SessionStats {
     pruneTokenCounter: number
     totalPruneTokens: number
@@ -177,7 +166,6 @@ export interface SessionState {
     nudges: Nudges
     stats: SessionStats
     compressionTiming: CompressionTimingState
-    toolParameters: Map<string, ToolParameterEntry>
     toolIdList: string[]
     messageIds: MessageIdState
     lastCompaction: number

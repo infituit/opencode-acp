@@ -5,7 +5,7 @@ import type {
 import type { SessionState, WithParts } from "../state"
 import { formatBlockRef, formatMessageRef, parseBoundaryId, parseMessageRef } from "../message-ids"
 import { isIgnoredUserMessage } from "../messages/query"
-import { estimateAllMessageTokensFast } from "../token-utils"
+import { estimateAllMessageTokensFast } from "../context-usage"
 import {
     type BoundaryReference,
     type SearchContext,

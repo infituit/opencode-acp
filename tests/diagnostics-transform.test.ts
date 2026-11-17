@@ -85,11 +85,11 @@ test("real transform preserves output with diagnostics and covers early return a
         })
         assert.deepEqual(traced, plain)
         assert.equal(records.length, 1)
+        assert.equal("syncToolCache" in records[0].stageMs.transform, false)
         for (const stage of [
             "resolveSession",
             "resolveModel",
             "updatePerTurnState",
-            "syncToolCache",
             "prePruneTokens",
             "postTokens",
             "saveContext",

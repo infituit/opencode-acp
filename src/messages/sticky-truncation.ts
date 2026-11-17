@@ -19,7 +19,7 @@
  * disk), so nothing is lost; the wire view is simply stable.
  */
 
-import { extractCompletedToolOutput } from "../token-utils"
+import { extractCompletedToolOutput } from "../context-usage"
 import type { Logger } from "../logger"
 import type { SessionState, WithParts } from "../state"
 

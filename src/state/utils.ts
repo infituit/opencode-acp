@@ -8,7 +8,7 @@ import type {
 import type { PluginConfig } from "../config"
 import { isIgnoredUserMessage, messageHasCompress } from "../messages/query"
 import { isMessageWithInfo } from "../messages/shape"
-import { countTokens } from "../token-utils"
+import { countTokens } from "../context-usage"
 
 // [FIX Bug 3] Added summary check to match getCurrentTokenUsage exclusion logic
 export const isMessageCompacted = (state: SessionState, msg: WithParts): boolean => {
@@ -400,7 +400,6 @@ export function getTierTokenUsage(state: SessionState): {
 }
 
 export function resetOnCompaction(state: SessionState): void {
-    state.toolParameters.clear()
     // [PATCH Bug 2] Preserve prune.messages (compression blocks) on compaction.
     // Only reset transient state. Compression blocks are still valid even after
     // opencode compacts — their summaries are still needed in context.

@@ -35,7 +35,7 @@ import {
     applyCompressionState,
     wrapCompressedSummary,
 } from "../compress/state"
-import { countTokens } from "../token-utils"
+import { countTokens } from "../context-usage"
 import { createHash } from "node:crypto"
 import type { PersistedSessionState } from "./persistence"
 import { createPruneMessagesState } from "./utils"

@@ -1,5 +1,5 @@
 import type { PluginConfig } from "../../config"
-import { countMessageCharacters } from "../../token-utils"
+import { countMessageCharacters } from "../../context-usage"
 import { isIgnoredUserMessage, isSyntheticMessage } from "../query"
 import type { SessionState, WithParts } from "../../state"
 import { computeProtectedRefs } from "./utils"

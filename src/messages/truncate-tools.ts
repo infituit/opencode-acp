@@ -1,7 +1,7 @@
 import { SessionState, WithParts } from "../state"
 import type { PluginConfig } from "../config"
 import { Logger } from "../logger"
-import { getCurrentTokenUsage, countTokens, extractCompletedToolOutput } from "../token-utils"
+import { getCurrentTokenUsage, countTokens, extractCompletedToolOutput } from "../context-usage"
 import { resolveEffectiveContextLimit } from "../state/utils"
 
 const TRUNCATION_MARKER = "[truncated for context space"
