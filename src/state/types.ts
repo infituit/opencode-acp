@@ -159,6 +159,8 @@ export interface Nudges {
 }
 
 export interface SessionState {
+    /** Transient: host deliveries actually included in the most recent model request. */
+    visibleHostInputIds?: ReadonlySet<string>
     sessionId: string | null
     isSubAgent: boolean
     compressPermission: "ask" | "allow" | "deny" | undefined

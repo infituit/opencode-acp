@@ -9,6 +9,7 @@ import { countMessageCharacters } from "../../context-usage"
 import {
     getLastUserMessage,
     isIgnoredUserMessage,
+    isUserPrompt,
     isProtectedUserMessage,
     messageHasCompress,
     messageHasCompressAttempt,
@@ -121,9 +122,7 @@ export const injectCompressNudges = (
         messages,
     )
 
-    const lastUserIdx = messages.findLastIndex(
-        (m) => m.info.role === "user" && !isIgnoredUserMessage(m),
-    )
+    const lastUserIdx = messages.findLastIndex(isUserPrompt)
     const currentTurnStart = lastUserIdx >= 0 ? lastUserIdx + 1 : 0
     const currentTurnHasCompress = messages
         .slice(currentTurnStart)
@@ -241,7 +240,7 @@ export const injectCompressNudges = (
             anchorsChanged = true
         }
         if (overMinLimit) {
-            const isLastMessageUser = lastMessage?.message.info.role === "user"
+            const isLastMessageUser = lastMessage && isUserPrompt(lastMessage.message)
 
             if (isLastMessageUser && lastAssistantMessage) {
                 const previousSize = state.nudges.turnNudgeAnchors.size
@@ -960,8 +959,9 @@ function refNumber(ref: string): number {
  * picking a ref that lives inside a compressed hole.
  */
 export function buildVisibleSegments(state: SessionState, messages: WithParts[]): VisibleSegment[] {
-    const refInfo = new Map<string, { tokens: number; hasTool: boolean }>()
-    for (const msg of messages) {
+    const refInfo = new Map<string, { index: number; tokens: number; hasTool: boolean }>()
+    for (let index = 0; index < messages.length; index++) {
+        const msg = messages[index]
         const ref = state.messageIds.byRawId.get(msg.info.id)
         if (!ref) continue
         let tokens = 0
@@ -974,18 +974,18 @@ export function buildVisibleSegments(state: SessionState, messages: WithParts[])
                 hasTool = true
             }
         }
-        refInfo.set(ref, { tokens, hasTool })
+        refInfo.set(ref, { index, tokens, hasTool })
     }
     if (refInfo.size === 0) return []
 
-    const refs = Array.from(refInfo.keys()).sort((a, b) => refNumber(a) - refNumber(b))
     const segments: VisibleSegment[] = []
     let cur: VisibleSegment | null = null
     let prevNum = -2
-    for (const ref of refs) {
+    let previousIndex = -2
+    // Backfilled aliases need not be monotonic; request order is authoritative.
+    for (const [ref, info] of refInfo) {
         const num = refNumber(ref)
-        const info = refInfo.get(ref)!
-        if (cur && num === prevNum + 1) {
+        if (cur && info.index === previousIndex + 1 && num === prevNum + 1) {
             cur.endRef = ref
             cur.count++
             cur.tokens += info.tokens
@@ -1001,6 +1001,7 @@ export function buildVisibleSegments(state: SessionState, messages: WithParts[])
             }
         }
         prevNum = num
+        previousIndex = info.index
     }
     if (cur) segments.push(cur)
     return segments

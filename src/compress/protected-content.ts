@@ -1,6 +1,6 @@
 import type { SessionState, WithParts } from "../state"
 import type { CompressConfig } from "../config"
-import { isIgnoredUserMessage, isSyntheticMessage } from "../messages/query"
+import { isIgnoredUserMessage, isSyntheticMessage, isUserPrompt } from "../messages/query"
 import {
     getFilePathsFromParameters,
     isFilePathProtected,
@@ -28,8 +28,7 @@ export function appendProtectedUserMessages(
 
         const message = searchContext.rawMessagesById.get(messageId)
         if (!message) continue
-        if (message.info.role !== "user") continue
-        if (isIgnoredUserMessage(message)) continue
+        if (!isUserPrompt(message)) continue
 
         const parts = Array.isArray(message.parts) ? message.parts : []
         for (const part of parts) {
@@ -68,8 +67,7 @@ export function appendProtectedPromptInfo(
 
         const message = searchContext.rawMessagesById.get(messageId)
         if (!message) continue
-        if (message.info.role !== "user") continue
-        if (isIgnoredUserMessage(message)) continue
+        if (!isUserPrompt(message)) continue
 
         const parts = Array.isArray(message.parts) ? message.parts : []
         for (const part of parts) {
@@ -213,9 +211,7 @@ export function filterProtectedToolMessages(
         return selection
     }
 
-    const filteredMessageIds = selection.messageIds.filter(
-        (id) => !removedMessageIds.has(id),
-    )
+    const filteredMessageIds = selection.messageIds.filter((id) => !removedMessageIds.has(id))
     const filteredMessageTokenById = new Map<string, number>()
     for (const id of filteredMessageIds) {
         const tokens = selection.messageTokenById.get(id)
@@ -247,13 +243,10 @@ export function filterLastUserMessage(
         const msg = searchContext.rawMessages[i]
         const id = msg?.info?.id
         if (!id || typeof id !== "string") continue
-        if (isSyntheticMessage(msg)) continue
-        if (isIgnoredUserMessage(msg)) continue
+        if (!isUserPrompt(msg)) continue
         if (state.prune.messages.byMessageId.has(id)) continue
-        if (msg.info.role === "user") {
-            lastUserMessageId = id
-            break
-        }
+        lastUserMessageId = id
+        break
     }
 
     if (!lastUserMessageId || !selection.messageIds.includes(lastUserMessageId)) {

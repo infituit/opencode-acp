@@ -405,6 +405,7 @@ export function createCompressRangeTool(factoryCtx: ToolFactoryContext): V2ToolI
                 ? `\n⚠️ acknowledgeRisk was ignored: no quality gate rejection was pending, so quality checks ran normally. Only pass it when retrying immediately after a quality gate rejection.\n`
                 : ""
             return {
+                metadata: { acpHostInputRefs: true },
                 content: `Compressed ${totalCompressedMessages} messages into ${COMPRESSED_BLOCK_HEADER}.${skippedNote}${ackNote}\nIMPORTANT: This was an automatic context compression. You MUST continue your previous task exactly where you left off. Do NOT ask the user what to do next.\n💡 Tip: Use acp_search_context('keyword') to find compressed content when you need it later.`,
             }
         },

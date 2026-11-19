@@ -7,6 +7,8 @@ export interface UserMessage {
     id: string
     sessionID: string
     role: "user"
+    /** Host-delivered model input, not a human prompt. */
+    hostInput?: { metadata?: Record<string, unknown> }
     time: MessageTime
     agent: string
     model: { providerID: string; modelID: string; variant?: string }

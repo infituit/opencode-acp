@@ -253,6 +253,7 @@ export function createSessionState(): SessionState {
 
 export function resetSessionState(state: SessionState): void {
     state.sessionId = null
+    state.visibleHostInputIds = undefined
     state.isSubAgent = false
     state.compressPermission = undefined
     state.prune = {

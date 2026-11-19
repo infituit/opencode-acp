@@ -22,6 +22,7 @@ import {
 import type { HostPermissionSnapshot } from "../host-permissions"
 import { startAutoUpdate } from "../update"
 import { fetchV2SessionMessages, toV2RequestMessages } from "./messages"
+import { getRequestInput, isHostInput } from "../messages/query"
 
 async function findV2ToolName(
     ctx: Context,
@@ -54,7 +55,12 @@ async function notifySession(ctx: Context, title: string, message: string): Prom
                 ? (sessions[0] as { id: string }).id
                 : undefined
         if (sessionID) {
-            await ctx.session.synthetic({ sessionID, text: message, description: title })
+            await ctx.session.synthetic({
+                sessionID,
+                text: message,
+                description: title,
+                metadata: { source: "opencode-acp" },
+            })
         }
     } catch {
         // Configuration warnings must never prevent plugin startup.
@@ -185,7 +191,7 @@ export const AcpV2Plugin = Plugin.define({
             await diagnoseContext(logger, event.sessionID, async (diagnostic) => {
                 const timeline = diagnostic?.timeline("context", "fetchSessionMessages")
                 const checkpoint = (stage: string) => timeline?.next(stage)
-                const messages = await fetchV2SessionMessages(ctx, event.sessionID)
+                const messages = await fetchV2SessionMessages(ctx, event.sessionID, event.messages)
                 checkpoint("prepareMessages")
                 if (diagnostic) diagnostic.counts.inputMessages = messages.length
                 if (messages.length === 0) {
@@ -193,9 +199,7 @@ export const AcpV2Plugin = Plugin.define({
                     return
                 }
 
-                const lastUser = [...messages]
-                    .reverse()
-                    .find((message) => message.info.role === "user")
+                const lastUser = getRequestInput(messages)
                 if (lastUser?.info.role === "user") {
                     lastUser.info.agent = event.agent
                     lastUser.info.model = {
@@ -212,6 +216,12 @@ export const AcpV2Plugin = Plugin.define({
                 if (diagnostic) diagnostic.counts.outputMessages = output.messages.length
                 checkpoint("convertRequestMessages")
                 event.messages = toV2RequestMessages(output.messages) as typeof event.messages
+                const state = registry.get(event.sessionID)
+                if (state) {
+                    state.visibleHostInputIds = new Set(
+                        output.messages.filter(isHostInput).map((message) => message.info.id),
+                    )
+                }
                 checkpoint("transformSystem")
 
                 const systemOutput = {

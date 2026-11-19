@@ -29,7 +29,7 @@ import {
     createSyntheticTextPart,
     hasContent,
 } from "../utils"
-import { getLastUserMessage, isIgnoredUserMessage, isSyntheticMessage } from "../query"
+import { getRequestInput, isIgnoredUserMessage, isSyntheticMessage, isUserPrompt } from "../query"
 import { getActiveSummaryTokenUsage, resolveEffectiveContextLimit } from "../../state/utils"
 
 export interface LastUserModelContext {
@@ -94,7 +94,7 @@ export function countMessagesAfterIndex(messages: WithParts[], index: number): n
 }
 
 export function getModelInfo(messages: WithParts[]): LastUserModelContext {
-    const lastUserMessage = getLastUserMessage(messages)
+    const lastUserMessage = getRequestInput(messages)
     if (!lastUserMessage) {
         return {
             providerId: undefined,
@@ -502,7 +502,7 @@ function collectTurnNudgeAnchors(
     for (const message of messages) {
         if (!state.nudges.turnNudgeAnchors.has(message.info.id)) continue
 
-        if (message.info.role === targetRole) {
+        if (targetRole === "user" ? isUserPrompt(message) : message.info.role === targetRole) {
             turnNudgeAnchors.add(message.info.id)
         }
     }
@@ -757,6 +757,9 @@ export function estimateContextComposition(
 export interface CompressibleRange {
     startRef: string
     endRef: string
+    /** Positions in the input transcript; aliases may be backfilled out of order. */
+    startIndex?: number
+    endIndex?: number
     count: number
     tokens: number
     /**
@@ -777,6 +780,8 @@ export interface CompressibleRange {
 export interface ProtectedRange {
     startRef: string
     endRef: string
+    startIndex?: number
+    endIndex?: number
     count: number
     tokens: number
     tools: string[]
@@ -801,7 +806,7 @@ export function buildCompressibleRanges(
 ): ContextRanges {
     const msgInfo: {
         ref: string
-        refNum: number
+        rawIndex: number
         tokens: number
         effectiveTokens: number
         meaningful: boolean
@@ -810,7 +815,7 @@ export function buildCompressibleRanges(
     }[] = []
     const protectedMsgInfo: {
         ref: string
-        refNum: number
+        rawIndex: number
         tokens: number
         tools: string[]
     }[] = []
@@ -820,8 +825,6 @@ export function buildCompressibleRanges(
         if (isSyntheticMessage(msg)) continue
         const ref = state.messageIds.byRawId.get(msg.info.id)
         if (!ref) continue
-
-        const rn = parseInt(ref.slice(1), 10)
 
         if (
             (protectedTools.length > 0 || protectedFilePatterns.length > 0) &&
@@ -849,7 +852,7 @@ export function buildCompressibleRanges(
                     }
                 }
             }
-            protectedMsgInfo.push({ ref, refNum: rn, tokens, tools: [...tools] })
+            protectedMsgInfo.push({ ref, rawIndex: mi, tokens, tools: [...tools] })
             continue
         }
 
@@ -865,18 +868,18 @@ export function buildCompressibleRanges(
                 hasMeaningfulPart = true
             }
         }
-        if (msg.info.role === "user" && !isIgnoredUserMessage(msg)) {
+        if (isUserPrompt(msg)) {
             lastUserRefIdx.length = 0
             lastUserRefIdx.push(msgInfo.length)
         }
         msgInfo.push({
             ref,
-            refNum: rn,
+            rawIndex: mi,
             tokens,
             effectiveTokens: 0,
             meaningful: hasMeaningfulPart,
             isTool,
-            isUser: msg.info.role === "user",
+            isUser: isUserPrompt(msg),
         })
     }
 
@@ -888,7 +891,7 @@ export function buildCompressibleRanges(
 
     const groups: CompressibleRange[] = []
     let cur: CompressibleRange | null = null
-    let prevRefNum = -2
+    let previousIndex = -2
     for (const info of msgInfo) {
         // Split groups at the protected-zone boundary: close the current group
         // before skipping protected messages, so the unprotected head survives
@@ -898,22 +901,23 @@ export function buildCompressibleRanges(
                 groups.push(cur)
                 cur = null
             }
-            prevRefNum = info.refNum
+            previousIndex = info.rawIndex
             continue
         }
-        // Treat backwards aliases as a hard boundary. Older ACP builds reset
-        // aliases during native compaction, which could otherwise display an
-        // impossible range such as m01621-m00008.
-        const hasGap = info.refNum !== prevRefNum + 1
+        // Alias numbers are identifiers, not transcript positions. Hidden or
+        // protected messages must still break adjacency after host backfill.
+        const hasGap = info.rawIndex !== previousIndex + 1
         if (cur && ((info.isUser && cur.count >= 3) || hasGap)) {
             groups.push(cur)
             cur = null
         }
-        prevRefNum = info.refNum
+        previousIndex = info.rawIndex
         if (!cur) {
             cur = {
                 startRef: info.ref,
                 endRef: info.ref,
+                startIndex: info.rawIndex,
+                endIndex: info.rawIndex,
                 count: 1,
                 tokens: info.tokens,
                 effectiveTokens: info.effectiveTokens,
@@ -922,6 +926,7 @@ export function buildCompressibleRanges(
             }
         } else {
             cur.endRef = info.ref
+            cur.endIndex = info.rawIndex
             cur.count++
             cur.tokens += info.tokens
             cur.effectiveTokens += info.effectiveTokens
@@ -937,24 +942,27 @@ export function buildCompressibleRanges(
 
     const protectedGroups: ProtectedRange[] = []
     let pcur: ProtectedRange | null = null
-    let pPrevRefNum = -2
+    let previousProtectedIndex = -2
     for (const info of protectedMsgInfo) {
-        const hasGap = info.refNum > pPrevRefNum + 1
+        const hasGap = info.rawIndex !== previousProtectedIndex + 1
         if (pcur && hasGap) {
             protectedGroups.push(pcur)
             pcur = null
         }
-        pPrevRefNum = info.refNum
+        previousProtectedIndex = info.rawIndex
         if (!pcur) {
             pcur = {
                 startRef: info.ref,
                 endRef: info.ref,
+                startIndex: info.rawIndex,
+                endIndex: info.rawIndex,
                 count: 1,
                 tokens: info.tokens,
                 tools: [...info.tools],
             }
         } else {
             pcur.endRef = info.ref
+            pcur.endIndex = info.rawIndex
             pcur.count++
             pcur.tokens += info.tokens
             for (const t of info.tools) {
@@ -1061,8 +1069,8 @@ export function filterRecommendedRanges(
 interface MergedEntry {
     startRef: string
     endRef: string
-    startNum: number
-    endNum: number
+    startIndex?: number
+    endIndex?: number
     count: number
     tokens: number
     toolPct: number
@@ -1101,8 +1109,8 @@ export function formatCompressibleRanges(
         entries.push({
             startRef: r.startRef,
             endRef: r.endRef,
-            startNum: refNum(r.startRef),
-            endNum: refNum(r.endRef),
+            startIndex: r.startIndex,
+            endIndex: r.endIndex,
             count: r.count,
             tokens: r.tokens,
             toolPct: r.toolPct,
@@ -1119,8 +1127,8 @@ export function formatCompressibleRanges(
         entries.push({
             startRef: r.startRef,
             endRef: r.endRef,
-            startNum: refNum(r.startRef),
-            endNum: refNum(r.endRef),
+            startIndex: r.startIndex,
+            endIndex: r.endIndex,
             count: r.count,
             tokens: r.tokens,
             toolPct: 0,
@@ -1134,14 +1142,21 @@ export function formatCompressibleRanges(
         })
     }
 
-    entries.sort((a, b) => a.startNum - b.startNum)
+    entries.sort(
+        (a, b) => (a.startIndex ?? refNum(a.startRef)) - (b.startIndex ?? refNum(b.startRef)),
+    )
 
     const merged: MergedEntry[] = []
     for (const entry of entries) {
         const last = merged[merged.length - 1]
-        if (last && entry.startNum <= last.endNum + 1) {
+        if (
+            last &&
+            last.endIndex !== undefined &&
+            entry.startIndex === last.endIndex + 1 &&
+            last.protectedCount > 0 === entry.protectedCount > 0
+        ) {
             last.endRef = entry.endRef
-            last.endNum = Math.max(last.endNum, entry.endNum)
+            last.endIndex = entry.endIndex
             last.count += entry.count
             last.tokens += entry.tokens
             last.compressibleTokens += entry.compressibleTokens
@@ -1218,7 +1233,7 @@ export function computeProtectedRefs(
                 tokens += Math.round(JSON.stringify(part).length / 4)
             }
         }
-        visible.push({ ref, tokens, isUser: msg.info.role === "user" })
+        visible.push({ ref, tokens, isUser: isUserPrompt(msg) })
     }
 
     if (preserveN > 0) {

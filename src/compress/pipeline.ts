@@ -2,7 +2,7 @@ import type { PruneMessagesState, SessionState, SessionStats, WithParts } from "
 import { ensureSessionInitialized } from "../state"
 import { saveSessionState } from "../state/persistence"
 import { assignMessageRefs } from "../message-ids"
-import { isIgnoredUserMessage, isSyntheticMessage } from "../messages/query"
+import { isHostInput, isIgnoredUserMessage, isSyntheticMessage } from "../messages/query"
 import { getCurrentParams, getCurrentTokenUsage } from "../context-usage"
 import { sendCompressNotification } from "../ui/notification"
 import type { ToolContext } from "./types"
@@ -44,6 +44,16 @@ export interface PreparedSession {
     searchContext: SearchContext
 }
 
+/** A delivery arriving during a model run cannot be summarized by that run. */
+export function filterUnseenHostInputs(state: SessionState, messages: WithParts[]): WithParts[] {
+    return messages.filter(
+        (message) =>
+            !isHostInput(message) ||
+            state.visibleHostInputIds?.has(message.info.id) === true ||
+            (state.prune.messages.byMessageId.get(message.info.id)?.activeBlockIds.length ?? 0) > 0,
+    )
+}
+
 export async function prepareSession(
     ctx: ToolContext,
     toolCtx: RunContext,
@@ -51,7 +61,7 @@ export async function prepareSession(
 ): Promise<PreparedSession> {
     await ctx.assertPermission(toolCtx.sessionID)
 
-    const rawMessages = await fetchSessionMessages(ctx.client, toolCtx.sessionID)
+    let rawMessages = await fetchSessionMessages(ctx.client, toolCtx.sessionID)
 
     await ensureSessionInitialized(
         ctx.client,
@@ -62,6 +72,7 @@ export async function prepareSession(
         ctx.config,
     )
 
+    rawMessages = filterUnseenHostInputs(ctx.state, rawMessages)
     assignMessageRefs(ctx.state, rawMessages)
 
     return {

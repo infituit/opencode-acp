@@ -6,7 +6,7 @@ import type {
     WithParts,
 } from "./types"
 import type { PluginConfig } from "../config"
-import { isIgnoredUserMessage, messageHasCompress } from "../messages/query"
+import { isUserPrompt, messageHasCompress } from "../messages/query"
 import { isMessageWithInfo } from "../messages/shape"
 import { countTokens } from "../context-usage"
 
@@ -336,7 +336,7 @@ export function collectTurnNudgeAnchors(messages: WithParts[]): Set<string> {
         }
 
         if (message.info.role === "user") {
-            if (!isIgnoredUserMessage(message)) {
+            if (isUserPrompt(message)) {
                 pendingUserMessageId = message.info.id
             }
             continue
