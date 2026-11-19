@@ -9,8 +9,8 @@ body:
               感谢您填写缺陷报告！提交前请先搜索现有 issues，避免重复。
               Thanks for reporting a bug! Please search existing issues before submitting to avoid duplicates.
 
-              本插件面向 OpenCode 1.x，不支持 OpenCode 2.x；V2 问题不在本仓库支持范围内。
-              This plugin targets OpenCode 1.x, not 2.x; V2 issues are outside this repository's support scope.
+              ACP 2.x 要求 OpenCode >=2.1.4 且 <3，使用 V2 插件 API，不支持 OpenCode 1.x。
+              ACP 2.x requires OpenCode >=2.1.4 and <3, uses the V2 plugin API, and does not support OpenCode 1.x.
 
               请勿公开安全漏洞细节、API keys、tokens 或未脱敏的会话内容。
               Do not publish vulnerability details, API keys, tokens, or unredacted conversation content.

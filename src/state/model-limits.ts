@@ -1,3 +1,5 @@
+import type { Logger } from "../logger"
+
 /**
  * [FIX #312] Catalog of per-model context limits, keyed `${providerID}/${modelID}`.
  *
@@ -23,7 +25,7 @@ export interface ModelLimitCatalog {
     hydrateFromClient(client: unknown): Promise<number>
 }
 
-export function createModelLimitCatalog(): ModelLimitCatalog {
+export function createModelLimitCatalog(logger?: Logger): ModelLimitCatalog {
     const modelLimits = new Map<string, number>()
     return {
         record(providerId, modelId, limit) {
@@ -35,16 +37,29 @@ export function createModelLimitCatalog(): ModelLimitCatalog {
             return modelLimits.get(`${providerId}/${modelId}`)
         },
         /**
-         * Best-effort one-time seed from the V2 model catalog. Never throws;
+         * Best-effort load from the V2 model catalog. Never throws;
          * returns the number of model-limit entries recorded.
          */
         async hydrateFromClient(client: unknown): Promise<number> {
             try {
                 const v2Client = client as {
-                    model?: { list?: () => Promise<{ data: ReadonlyArray<unknown> }> }
+                    model?: { list?: () => Promise<{ data?: unknown }> }
+                } | null
+                if (typeof v2Client?.model?.list !== "function") {
+                    logger?.warn("Model limit catalog load failed", {
+                        reason: "api_unavailable",
+                        catalogSize: modelLimits.size,
+                    })
+                    return 0
                 }
-                const response = await v2Client.model!.list!()
-                if (!Array.isArray(response.data)) return 0
+                const response = await v2Client.model.list()
+                if (!Array.isArray(response?.data)) {
+                    logger?.warn("Model limit catalog load failed", {
+                        reason: "invalid_response",
+                        catalogSize: modelLimits.size,
+                    })
+                    return 0
+                }
                 let recorded = 0
                 for (const value of response.data) {
                     if (!value || typeof value !== "object") continue
@@ -64,8 +79,25 @@ export function createModelLimitCatalog(): ModelLimitCatalog {
                     modelLimits.set(`${model.providerID}/${model.id}`, model.limit.context)
                     recorded++
                 }
+                logger?.info("Model limit catalog loaded", {
+                    reason:
+                        response.data.length === 0
+                            ? "empty_catalog"
+                            : recorded === 0
+                              ? "no_valid_limits"
+                              : "loaded",
+                    entries: response.data.length,
+                    recorded,
+                    skipped: response.data.length - recorded,
+                    catalogSize: modelLimits.size,
+                })
                 return recorded
             } catch {
+                // Do not log response bodies or exception text: providers can embed credentials.
+                logger?.warn("Model limit catalog load failed", {
+                    reason: "request_failed",
+                    catalogSize: modelLimits.size,
+                })
                 return 0
             }
         },
