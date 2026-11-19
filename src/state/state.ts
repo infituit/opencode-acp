@@ -60,6 +60,7 @@ export async function updatePerTurnState(
 // from unbounded growth. Evicted sessions reload from persisted JSON on next
 // access; modelContextLimit and all persisted fields survive eviction.
 const REGISTRY_SOFT_CAP = 32
+const MODEL_LIMIT_RETRY_INTERVAL_MS = 30_000
 
 // [FIX #33] Per-session state. Replaces the single shared SessionState singleton
 // whose resetSessionState-on-switch wiped modelContextLimit (set only by
@@ -84,12 +85,14 @@ export class SessionStateRegistry {
     // model named on the request's user message instead of waiting one turn
     // for the system hook. Shared implementation — the test registry stub
     // composes the same factory.
-    private readonly catalog = createModelLimitCatalog()
+    private readonly catalog: ReturnType<typeof createModelLimitCatalog>
 
     constructor(
         private readonly logger: Logger,
         private readonly projectDir?: string,
-    ) {}
+    ) {
+        this.catalog = createModelLimitCatalog(logger)
+    }
 
     recordModelLimit(
         providerId: string | undefined,
@@ -106,24 +109,16 @@ export class SessionStateRegistry {
         return this.catalog.resolve(providerId, modelId)
     }
 
-    /**
-     * Best-effort one-time seed from the host's provider catalog
-     * V2 model catalog. Never throws; returns the number of model-limit entries recorded.
-     * returns the number of model-limit entries recorded.
-     */
+    /** Best-effort seed from the V2 model catalog; returns the number of recorded entries. */
     hydrateModelLimitsFromClient(client: unknown): Promise<number> {
         return this.catalog.hydrateFromClient(client)
     }
 
-    // [FIX #346] The init-time seed (above) is fire-and-forget and races
-    // server readiness: in headless spawn+resume mode the provider-config
-    // call can fail before the server is up, leaving the catalog empty for
-    // the process's lifetime. During a request the server is guaranteed up
-    // (we are inside its pipeline), so on a catalog miss we retry hydration
-    // once per process before giving up (the fallback limit then applies).
-    // The in-flight promise (not a boolean) lets concurrent callers await the
-    // same hydration instead of skipping it.
+    // Initialization can precede provider readiness. Retry request-time misses,
+    // sharing in-flight work and cooling down completed attempts so an unknown
+    // model cannot cause a catalog request on every turn. Cache hits never wait.
     private lazyHydration: Promise<number> | undefined
+    private nextModelLimitRetryAt = 0
 
     async hydrateAndResolve(
         client: unknown,
@@ -134,9 +129,21 @@ export class SessionStateRegistry {
         if (existing !== undefined) {
             return existing
         }
-        this.lazyHydration ??= this.catalog.hydrateFromClient(client)
+        if (!this.lazyHydration && Date.now() >= this.nextModelLimitRetryAt) {
+            this.lazyHydration = this.catalog.hydrateFromClient(client).finally(() => {
+                this.nextModelLimitRetryAt = Date.now() + MODEL_LIMIT_RETRY_INTERVAL_MS
+                this.lazyHydration = undefined
+            })
+        }
         await this.lazyHydration
-        return this.catalog.resolve(providerId, modelId)
+        const limit = this.catalog.resolve(providerId, modelId)
+        this.logger.debug("Model limit catalog lookup", {
+            model: `${providerId}/${modelId}`,
+            reason: limit === undefined ? "model_not_found" : "model",
+            retryAfterMs:
+                limit === undefined ? Math.max(0, this.nextModelLimitRetryAt - Date.now()) : 0,
+        })
+        return limit
     }
 
     get(sessionId: string): SessionState | undefined {

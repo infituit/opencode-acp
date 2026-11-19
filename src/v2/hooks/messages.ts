@@ -127,11 +127,9 @@ export function createChatMessageTransformHandler(
                     requestModel?.providerID,
                     requestModel?.modelID,
                 )
-                // [FIX #346] Catalog miss: the init-time seed is fire-and-forget and
-                // races server readiness, so in headless spawn+resume mode the
-                // catalog can stay empty for the whole process lifetime. During a
-                // request the server is guaranteed up (we are inside its pipeline),
-                // so retry hydration once per process before any threshold math.
+                // Retry catalog misses through the registry's shared, rate-limited
+                // loader before computing thresholds; initialization may precede
+                // provider readiness.
                 if (
                     requestModelLimit === undefined &&
                     requestModel?.providerID &&
@@ -188,11 +186,16 @@ export function createChatMessageTransformHandler(
                         undefined
                 ) {
                     state.noContextLimitWarned = true
+                    const effectiveLimit = resolveEffectiveContextLimit(state, config)
                     logger.warn(
-                        'Model reports no context window and the catalog has no entry for it; all percentage thresholds (min/max/emergency, GC) and the context-budget guard are disabled. Set the model limit in opencode.json (e.g. "limit": {"context": 262144, "output": 16384}) to enable them (also fixes the 32000 max_tokens fallback); an absolute compress.maxContextLimit in acp.jsonc only enables proactive nudges, not the guard.',
+                        effectiveLimit
+                            ? "Model context window is unavailable in the catalog; using compress.contextLimitFallback. A smaller fallback may trigger compression early; a larger one may overestimate the available budget. Check the provider/model limit in OpenCode and the model catalog load logs. Catalog misses are retried on later requests with a cooldown."
+                            : "Model context window is unavailable in the catalog and compress.contextLimitFallback is disabled; checks that require a context window cannot run. Absolute compress.maxContextLimit can still trigger proactive nudges. Check the provider/model limit in OpenCode and the model catalog load logs. Catalog misses are retried on later requests with a cooldown.",
                         {
                             session: state.sessionId,
                             model: `${requestModel.providerID}/${requestModel.modelID}`,
+                            contextLimit: effectiveLimit?.limit ?? 0,
+                            contextLimitSource: effectiveLimit?.source ?? "unknown",
                         },
                     )
                 }
