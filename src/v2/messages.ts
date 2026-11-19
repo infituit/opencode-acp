@@ -6,6 +6,8 @@ type V2Message = {
     sessionID?: string
     time?: { created?: number }
     text?: string
+    description?: string
+    metadata?: Record<string, unknown>
     agent?: string
     model?: { providerID?: string; id?: string }
     content?: unknown[]
@@ -27,6 +29,7 @@ type V2ToolPart = {
         input?: unknown
         content?: unknown
         error?: unknown
+        metadata?: Record<string, unknown>
     }
 }
 
@@ -66,12 +69,15 @@ function convertToolPart(part: V2ToolPart): Record<string, unknown> {
             status,
             input: state?.input ?? part.input,
             output: textFromContent(output),
+            ...(state?.metadata?.acpHostInputRefs === true
+                ? { metadata: { acpHostInputRefs: true } }
+                : {}),
         },
     }
 }
 
 function convertParts(message: V2Message): unknown[] {
-    if (message.type === "user") {
+    if (message.type === "user" || message.type === "synthetic") {
         const parts: unknown[] = []
         if (typeof message.text === "string") {
             parts.push({ type: "text", text: message.text })
@@ -106,22 +112,60 @@ function convertParts(message: V2Message): unknown[] {
     return parts
 }
 
-/** Convert V2 durable session messages into ACP's domain message view. */
-export function fromV2SessionMessages(input: unknown, sessionID: string): WithParts[] {
+type V2RequestInput = {
+    id?: string
+    role?: string
+    content?: unknown
+    metadata?: Record<string, unknown>
+}
+
+/** ACP notifications are UI output, not fresh model input. */
+function isAcpNotification(message: V2Message): boolean {
+    return (
+        message.metadata?.source === "opencode-acp" ||
+        (message.metadata?.source === undefined &&
+            (message.description === "ACP" ||
+                message.description === "ACP update ready" ||
+                message.description?.startsWith("ACP:") === true))
+    )
+}
+
+/** Convert durable messages, restricting host deliveries to the active request when supplied. */
+export function fromV2SessionMessages(
+    input: unknown,
+    sessionID: string,
+    requestMessages?: readonly unknown[],
+): WithParts[] {
     if (!Array.isArray(input)) return []
+
+    const requestInputs = new Map<string, V2RequestInput>()
+    for (const value of requestMessages ?? []) {
+        if (!value || typeof value !== "object") continue
+        const message = value as V2RequestInput
+        if (message.role === "user" && typeof message.id === "string") {
+            requestInputs.set(message.id, message)
+        }
+    }
 
     const result: WithParts[] = []
     for (const value of input) {
         if (!value || typeof value !== "object") continue
         const message = value as V2Message
-        if (message.type !== "user" && message.type !== "assistant") continue
+        const hostInput = message.type === "synthetic"
+        if (!hostInput && message.type !== "user" && message.type !== "assistant") continue
         if (typeof message.id !== "string") continue
+        const requestInput = requestInputs.get(message.id)
+        if (hostInput && (isAcpNotification(message) || (requestMessages && !requestInput)))
+            continue
 
-        const role = message.type
+        const role = hostInput ? "user" : message.type
         const info = {
             id: message.id,
             sessionID,
             role,
+            ...(hostInput
+                ? { hostInput: { metadata: requestInput?.metadata ?? message.metadata } }
+                : {}),
             time: { created: createdAt(message) },
             agent: message.agent ?? "code",
             model: {
@@ -137,9 +181,16 @@ export function fromV2SessionMessages(input: unknown, sessionID: string): WithPa
             tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
         }
 
+        const projectedContent = hostInput ? requestInput?.content : undefined
+        const parts =
+            typeof projectedContent === "string"
+                ? [{ type: "text", text: projectedContent }]
+                : Array.isArray(projectedContent)
+                  ? projectedContent.map((part) => structuredClone(part))
+                  : convertParts(message)
         result.push({
             info: info as WithParts["info"],
-            parts: convertParts(message) as WithParts["parts"],
+            parts: parts as WithParts["parts"],
         })
     }
     return result
@@ -148,6 +199,7 @@ export function fromV2SessionMessages(input: unknown, sessionID: string): WithPa
 export async function fetchV2SessionMessages(
     client: unknown,
     sessionID: string,
+    requestMessages?: readonly unknown[],
 ): Promise<WithParts[]> {
     const runtime = client as {
         session?: { context?: (input: { sessionID: string }) => Promise<unknown> }
@@ -155,7 +207,11 @@ export async function fetchV2SessionMessages(
     if (typeof runtime.session?.context !== "function") {
         return []
     }
-    return fromV2SessionMessages(await runtime.session.context({ sessionID }), sessionID)
+    return fromV2SessionMessages(
+        await runtime.session.context({ sessionID }),
+        sessionID,
+        requestMessages,
+    )
 }
 
 function toolIdentity(part: Record<string, unknown>) {
@@ -240,7 +296,13 @@ export function toV2RequestMessages(messages: WithParts[]): unknown[] {
         }
 
         if (content.length > 0) {
-            result.push({ role: message.info.role, content })
+            result.push({
+                role: message.info.role,
+                content,
+                ...(message.info.role === "user" && message.info.hostInput
+                    ? { id: message.info.id, metadata: message.info.hostInput.metadata }
+                    : {}),
+            })
         }
     }
 

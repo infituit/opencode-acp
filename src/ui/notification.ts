@@ -284,6 +284,7 @@ export async function sendCompressNotification(
         sessionID: sessionId,
         text: toastMessage,
         description: "ACP: Compress Notification",
+        metadata: { source: "opencode-acp" },
     })
     return true
 }
@@ -300,6 +301,7 @@ export async function sendIgnoredMessage(
             sessionID,
             text,
             description: "ACP",
+            metadata: { source: "opencode-acp" },
         })
     } catch (error: any) {
         logger.error("Failed to send notification", { error: error.message })

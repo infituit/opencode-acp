@@ -19,7 +19,7 @@ import type { PromptStore } from "../../prompts"
 import { DEFAULT_COMPRESS_IMAGES, DEFAULT_COMPRESS_REASONING } from "../../config"
 import { archiveSessionImages, pruneImageArchive } from "../../compress/image-archive"
 import { filterMessagesInPlace } from "../../messages/shape"
-import { getLastUserMessage, isSyntheticMessage } from "../../messages/query"
+import { getRequestInput, isSyntheticMessage } from "../../messages/query"
 import { OUTPUT_RESERVE_TOKENS, truncateLargeToolOutputs } from "../../messages/truncate-tools"
 import {
     applyStickyTruncations,
@@ -56,11 +56,11 @@ import { recordVisibleMessages } from "../../compress/smart-plan"
 const INTERNAL_AGENT_NAMES = new Set(["title", "summary", "compaction"])
 
 function isInternalAgentRequest(messages: WithParts[]): boolean {
-    const lastUserMessage = getLastUserMessage(messages)
-    if (!lastUserMessage) {
+    const requestInput = getRequestInput(messages)
+    if (!requestInput) {
         return false
     }
-    const agent = (lastUserMessage.info as { agent?: unknown }).agent
+    const agent = (requestInput.info as { agent?: unknown }).agent
     return typeof agent === "string" && INTERNAL_AGENT_NAMES.has(agent)
 }
 
@@ -96,9 +96,9 @@ export function createChatMessageTransformHandler(
             }
 
             checkpoint("resolveSession")
-            const lastUserMessage = getLastUserMessage(messages)
+            const requestInput = getRequestInput(messages)
             let state: SessionState
-            if (!lastUserMessage) {
+            if (!requestInput) {
                 // Ephemeral state: no session to resolve, but keep running
                 // state-independent stages (e.g. stripHallucinations).
                 state = createSessionState()
@@ -107,7 +107,7 @@ export function createChatMessageTransformHandler(
                 // so interleaved sessions no longer reset each other's modelContextLimit.
                 state = await registry.getOrCreate(
                     client,
-                    lastUserMessage.info.sessionID,
+                    requestInput.info.sessionID,
                     messages,
                     config,
                 )
@@ -121,7 +121,7 @@ export function createChatMessageTransformHandler(
                 // catalog entry for the model named on this request's user message
                 // before any consumer (filters, GC, nudge thresholds) reads it.
                 const requestModel = (
-                    lastUserMessage.info as { model?: { providerID?: string; modelID?: string } }
+                    requestInput.info as { model?: { providerID?: string; modelID?: string } }
                 ).model
                 let requestModelLimit = registry.resolveModelLimit(
                     requestModel?.providerID,
@@ -223,7 +223,7 @@ export function createChatMessageTransformHandler(
             // fallback). Runs BEFORE token accounting / pruning so every later
             // stage sees the post-drop array.
             const dropReasoningModel = (
-                lastUserMessage?.info as
+                requestInput?.info as
                     { model?: { providerID?: string; modelID?: string } } | undefined
             )?.model
             const reasoningConfig = applyCompressOverrides(

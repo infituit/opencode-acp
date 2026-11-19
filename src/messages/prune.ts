@@ -1,6 +1,8 @@
 import type { SessionState, WithParts } from "../state"
 import type { Logger } from "../logger"
 import type { PluginConfig } from "../config"
+import { isHostInput, isUserPrompt } from "./query"
+import { createSyntheticUserMessage } from "./utils"
 
 export const prune = (
     state: SessionState,
@@ -49,10 +51,7 @@ const stripStepMarkers = (messages: WithParts[]): void => {
     }
 }
 
-const filterCompressedRanges = (
-    state: SessionState,
-    messages: WithParts[],
-): void => {
+const filterCompressedRanges = (state: SessionState, messages: WithParts[]): void => {
     if (state.prune.messages.byMessageId.size === 0) {
         return
     }
@@ -65,15 +64,8 @@ const filterCompressedRanges = (
         return false
     })
 
-    // [FIX preserve-first-user] zhipuai-lb (and most providers) reject requests
-    // with zero user-role messages (code 1214, "The messages parameter is
-    // illegal"), freezing the session. The first user message is the session's
-    // original task — it must always survive compression to guarantee API
-    // validity. This is simpler and more reliable than the previous
-    // "restore most recent pruned user" approach, which depended on the
-    // pruned message still being in the messages array (not guaranteed after
-    // OpenCode compaction).
-    const firstUserIdx = messages.findIndex((msg) => msg.info.role === "user")
+    // Preserve the original human task, not a host-delivered handoff payload.
+    const firstUserIdx = messages.findIndex(isUserPrompt)
     if (firstUserIdx >= 0) {
         survive[firstUserIdx] = true
     }
@@ -82,6 +74,23 @@ const filterCompressedRanges = (
     for (let i = 0; i < messages.length; i++) {
         if (survive[i]) {
             result.push(messages[i]!)
+        }
+    }
+
+    // Some providers require a user-role message. If compression removed the
+    // only host delivery, satisfy the wire contract without resurrecting it.
+    if (!result.some((message) => message.info.role === "user")) {
+        const compressedHostInput = messages.find(
+            (message, index) => !survive[index] && isHostInput(message),
+        )
+        if (compressedHostInput) {
+            result.unshift(
+                createSyntheticUserMessage(
+                    compressedHostInput,
+                    "Earlier host input has been compressed.",
+                    "acp-compressed-host-input",
+                ),
+            )
         }
     }
 

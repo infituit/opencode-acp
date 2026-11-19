@@ -4,7 +4,7 @@ import { Logger } from "./logger"
 import * as _anthropicTokenizer from "@anthropic-ai/tokenizer"
 const getAnthropicTokenizer = (_anthropicTokenizer.getTokenizer ??
     (_anthropicTokenizer as any).default?.getTokenizer) as typeof _anthropicTokenizer.getTokenizer
-import { getLastUserMessage } from "./messages/query"
+import { getRequestInput, isUserPrompt } from "./messages/query"
 
 // The convenience countTokens API constructs and frees a WASM tokenizer per call.
 let tokenizer: ReturnType<typeof getAnthropicTokenizer> | undefined
@@ -86,7 +86,7 @@ export function estimateSystemPromptTokens(messages: WithParts[]): number {
 
     let firstUserText = ""
     for (const msg of messages) {
-        if (msg.info.role !== "user") continue
+        if (!isUserPrompt(msg)) continue
         const parts = Array.isArray(msg.parts) ? msg.parts : []
         for (const part of parts) {
             if (part.type === "text" && typeof part.text === "string") {
@@ -108,7 +108,7 @@ export function getCurrentParams(
     agent: string | undefined
     variant: string | undefined
 } {
-    const userMsg = getLastUserMessage(messages)
+    const userMsg = getRequestInput(messages)
     if (!userMsg) {
         logger.debug("No user message found when determining current params")
         return {

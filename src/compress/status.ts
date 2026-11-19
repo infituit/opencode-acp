@@ -25,6 +25,7 @@ import {
 } from "../messages/inject/candidates"
 import { buildSearchContext, fetchSessionMessages } from "./search"
 import { hideConsumedCompressCalls } from "./hide-consumed"
+import { filterUnseenHostInputs } from "./pipeline"
 import { estimateSystemPromptTokens } from "../context-usage"
 import { armBestSmartPlan, clearSmartPlan, getVisibleMessageIds } from "./smart-plan"
 import { assignMessageRefs, repairNonMonotonicMessageRefs } from "../message-ids"
@@ -707,7 +708,10 @@ export function createAcpStatusToolV2(factoryCtx: ToolFactoryContext): V2ToolInf
 
             let rawMessages: WithParts[] = []
             try {
-                rawMessages = await fetchSessionMessages(ctx.client, toolCtx.sessionID)
+                rawMessages = filterUnseenHostInputs(
+                    ctx.state,
+                    await fetchSessionMessages(ctx.client, toolCtx.sessionID),
+                )
             } catch {
                 if (scope === "uncompressed") return { content: "(unable to fetch messages)" }
             }

@@ -1,6 +1,6 @@
 import { SessionState, WithParts } from "../state"
 import { countTokens } from "../context-usage"
-import { isIgnoredUserMessage } from "../messages/query"
+import { isUserPrompt } from "../messages/query"
 
 export function formatAge(createdAt: number): string {
     const elapsed = Date.now() - createdAt
@@ -83,7 +83,7 @@ export function cacheSystemPromptTokens(state: SessionState, messages: WithParts
 
     let firstUserText = ""
     for (const msg of messages) {
-        if (msg.info.role !== "user" || isIgnoredUserMessage(msg)) {
+        if (!isUserPrompt(msg)) {
             continue
         }
         const parts = Array.isArray(msg.parts) ? msg.parts : []

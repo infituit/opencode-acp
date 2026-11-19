@@ -12,6 +12,28 @@ export function isSyntheticMessage(message: WithParts): boolean {
     )
 }
 
+export function isHostInput(message: WithParts): boolean {
+    return (
+        isMessageWithInfo(message) &&
+        message.info.role === "user" &&
+        message.info.hostInput !== undefined
+    )
+}
+
+export function isUserPrompt(message: WithParts): boolean {
+    return (
+        isMessageWithInfo(message) &&
+        message.info.role === "user" &&
+        !isHostInput(message) &&
+        !isIgnoredUserMessage(message) &&
+        !isSyntheticMessage(message)
+    )
+}
+
+export function getRequestInput(messages: WithParts[]): WithParts | null {
+    return getLastUserMessage(messages) ?? messages.findLast(isHostInput) ?? null
+}
+
 export const getLastUserMessage = (
     messages: WithParts[],
     startIndex?: number,
@@ -22,7 +44,7 @@ export const getLastUserMessage = (
         if (!isMessageWithInfo(msg)) {
             continue
         }
-        if (msg.info.role === "user" && !isIgnoredUserMessage(msg) && !isSyntheticMessage(msg)) {
+        if (isUserPrompt(msg)) {
             return msg
         }
     }

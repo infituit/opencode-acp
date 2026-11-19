@@ -1,5 +1,5 @@
 import type { SessionState, WithParts } from "./state"
-import { isIgnoredUserMessage } from "./messages/query"
+import { isHostInput, isIgnoredUserMessage, isUserPrompt } from "./messages/query"
 
 const MESSAGE_REF_REGEX = /^m(\d{4,5})$/
 const BLOCK_REF_REGEX = /^b([1-9]\d*)$/
@@ -157,7 +157,7 @@ export function assignMessageRefs(state: SessionState, messages: WithParts[]): n
             continue
         }
 
-        if (state.isSubAgent && !skippedSubAgentPrompt && message.info.role === "user") {
+        if (state.isSubAgent && !skippedSubAgentPrompt && isUserPrompt(message)) {
             skippedSubAgentPrompt = true
             continue
         }
@@ -211,6 +211,9 @@ export function repairNonMonotonicMessageRefs(state: SessionState, messages: Wit
     let previous = 0
     let corrupted = false
     for (const message of eligible) {
+        // Host inputs were absent from historical alias epochs. Backfilling
+        // their refs appends aliases without changing the existing chronology.
+        if (isHostInput(message)) continue
         const ref = state.messageIds.byRawId.get(message.info.id)
         const parsed = ref ? parseMessageRef(ref) : null
         if (parsed === null) continue

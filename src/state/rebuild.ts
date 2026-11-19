@@ -8,9 +8,9 @@
  *
  * This module replays historical `compress` tool invocations in chronological
  * order, rebuilding `CompressionBlock`s / `byMessageId` / `activeByAnchorMessageId`
- * using the fork's NEW raw IDs. Because message refs (mNNNNN) are assigned
- * sequentially by message order, they are fork-stable: a ref in a compress
- * input points to the same logical message in both original and fork.
+ * using the fork's NEW raw IDs. Legacy refs (mNNNNN) are fork-stable when
+ * assigned in nonhost transcript order. Host-aware refs may instead have been
+ * backfilled; those invocations require existing aliases when hosts are present.
  *
  * The rebuilt state is an approximation: protected-content enrichments that
  * were appended to summaries at original-compress-time are not re-derived
@@ -20,7 +20,8 @@
  */
 import type { GCConfig, PluginConfig } from "../config"
 import type { Logger } from "../logger"
-import { assignMessageRefs } from "../message-ids"
+import { assignMessageRefs, parseMessageRef } from "../message-ids"
+import { isHostInput } from "../messages/query"
 import {
     buildSearchContext,
     resolveAnchorMessageId,
@@ -54,6 +55,7 @@ interface CompressInvocation {
     messageId: string
     callId: string | undefined
     input: unknown
+    hostInputRefs: boolean
 }
 
 function collectCompressInvocations(messages: WithParts[]): CompressInvocation[] {
@@ -77,6 +79,7 @@ function collectCompressInvocations(messages: WithParts[]): CompressInvocation[]
                 messageId: message.info.id,
                 callId: typeof part.callID === "string" ? part.callID : undefined,
                 input,
+                hostInputRefs: part.state?.metadata?.acpHostInputRefs === true,
             })
         }
     }
@@ -212,8 +215,32 @@ export function restoreForkCompressionState(
 ): number {
     if (!parent.prune.messages || !parent.messageIds) return 0
 
-    assignMessageRefs(state, forkMessages)
-    const mapped = mapForkIds(state, parent, parentMessages, forkMessages)
+    // A host-aware parent's alias chronology cannot be inferred from a fork:
+    // hosts may have been backfilled after older aliases were already issued.
+    // Without fork aliases, leave the raw history intact instead of guessing.
+    if (
+        state.messageIds.byRawId.size === 0 &&
+        parentMessages.some(
+            (message) => isHostInput(message) && parent.messageIds?.byRawId[message.info.id],
+        )
+    ) {
+        return 0
+    }
+
+    const forkState = {
+        ...state,
+        messageIds: {
+            ...state.messageIds,
+            byRawId: new Map(state.messageIds.byRawId),
+            byRef: new Map(state.messageIds.byRef),
+        },
+    }
+    assignMessageRefs(
+        forkState,
+        forkMessages.filter((message) => !isHostInput(message)),
+    )
+    assignMessageRefs(forkState, forkMessages)
+    const mapped = mapForkIds(forkState, parent, parentMessages, forkMessages)
     if (!mapped) return 0
 
     const parentBlocks = Object.values(parent.prune.messages.blocksById)
@@ -296,6 +323,7 @@ export function restoreForkCompressionState(
     messagesState.nextRunId = parent.prune.messages.nextRunId
     messagesState.membershipsVerified = true
     state.prune.messages = messagesState
+    state.messageIds = forkState.messageIds
 
     logger.info("fork: restored compression state from parent", {
         blocks: copiedBlockIds.size,
@@ -484,15 +512,20 @@ export function rebuildCompressionState(
     config: PluginConfig,
     logger: Logger,
 ): number {
-    // Assign refs first so boundary resolution can map mNNNNN → rawId.
-    // (In the normal pipeline this runs later in hooks.ts; calling it here
-    // is idempotent — the later call is a no-op.)
-    assignMessageRefs(state, messages)
-
     const invocations = collectCompressInvocations(messages)
     if (invocations.length === 0) {
+        assignMessageRefs(state, messages)
         return 0
     }
+
+    // Capture reliable aliases before allocating any locally. Legacy tool
+    // inputs used a transcript without host inputs; reserve that epoch first,
+    // then append host aliases without shifting historical references.
+    const existingRefs = new Map(state.messageIds.byRef)
+    const hasHostInputs = messages.some(isHostInput)
+    const legacyMessages = messages.filter((message) => !isHostInput(message))
+    assignMessageRefs(state, legacyMessages)
+    assignMessageRefs(state, messages)
 
     const protectedTools = config.compress.protectedTools
     const protectedFilePatterns = config.protectedFilePatterns
@@ -501,9 +534,33 @@ export function rebuildCompressionState(
     let rebuilt = 0
 
     for (const invocation of invocations) {
-        // Rebuild search context each iteration so blocks created by earlier
-        // invocations are visible (needed for nested bN boundary resolution).
-        const searchContext = buildSearchContext(state, messages)
+        if (invocation.hostInputRefs && hasHostInputs) {
+            const content = (invocation.input as { content?: unknown }).content
+            const hasReliableRefs =
+                existingRefs.size > 0 &&
+                Array.isArray(content) &&
+                content.every((entry) => {
+                    const refs = isRangeInput(invocation.input)
+                        ? [entry?.startId, entry?.endId]
+                        : [entry?.messageId]
+                    return refs.every(
+                        (ref) =>
+                            typeof ref === "string" &&
+                            (parseMessageRef(ref) === null ||
+                                existingRefs.has(ref.trim().toLowerCase())),
+                    )
+                })
+            if (!hasReliableRefs) {
+                logger.warn("rebuild: host-input aliases unavailable, stopping history replay")
+                break
+            }
+        }
+        // Old invocations must not accidentally prune a host input that was
+        // absent from their original ref/selection view.
+        const searchContext = buildSearchContext(
+            state,
+            invocation.hostInputRefs ? messages : legacyMessages,
+        )
 
         try {
             if (isRangeInput(invocation.input)) {

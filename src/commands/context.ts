@@ -44,7 +44,7 @@ import type { Logger } from "../logger"
 import type { SessionState, WithParts } from "../state"
 import { sendIgnoredMessage } from "../ui/notification"
 import { formatTokenCount } from "../ui/utils"
-import { isIgnoredUserMessage } from "../messages/query"
+import { isUserPrompt } from "../messages/query"
 import { isMessageCompacted } from "../state/utils"
 import { countTokens, extractCompletedToolOutput, getCurrentParams } from "../context-usage"
 import type { AssistantMessage, TextPart, ToolPart } from "../state/message-types"
@@ -134,7 +134,7 @@ function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdo
         const isCompacted = isMessageCompacted(state, msg)
         const pruneEntry = state.prune.messages.byMessageId.get(msg.info.id)
         const isMessagePruned = !!pruneEntry && pruneEntry.activeBlockIds.length > 0
-        const isIgnoredUser = isIgnoredUserMessage(msg)
+        const isHumanPrompt = isUserPrompt(msg)
 
         for (const part of parts) {
             if (part.type === "tool") {
@@ -163,12 +163,7 @@ function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdo
                         toolOutputParts.push(outputStr)
                     }
                 }
-            } else if (
-                part.type === "text" &&
-                msg.info.role === "user" &&
-                !isCompacted &&
-                !isIgnoredUser
-            ) {
+            } else if (part.type === "text" && isHumanPrompt && !isCompacted) {
                 const textPart = part as TextPart
                 const text = textPart.text || ""
                 userTextParts.push(text)
@@ -178,7 +173,7 @@ function analyzeTokens(state: SessionState, messages: WithParts[]): TokenBreakdo
             }
         }
 
-        if (msg.info.role === "user" && !isIgnoredUser && !foundFirstUser) {
+        if (isHumanPrompt && !foundFirstUser) {
             foundFirstUser = true
         }
     }

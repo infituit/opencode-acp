@@ -25,17 +25,25 @@ export interface SmartCompressionPlan {
 const armedPlans = new Map<string, SmartCompressionPlan>()
 const visibleMessageIdsBySession = new Map<string, Set<string>>()
 
-function refNumber(ref: string): number {
-    const value = Number.parseInt(ref.slice(1), 10)
-    return Number.isFinite(value) ? value : -1
-}
-
-/** Merge artificial size/turn splits, but never cross a protected ref gap. */
-function mergeAdjacentSafeRanges(ranges: CompressibleRange[]): CompressibleRange[] {
+/** Merge artificial size/turn splits, but never cross a transcript gap. */
+function mergeAdjacentSafeRanges(
+    ranges: CompressibleRange[],
+    searchContext: SearchContext,
+    ctx: SmartPlanContext,
+): CompressibleRange[] {
     const merged: CompressibleRange[] = []
     for (const range of ranges.filter((candidate) => !candidate.dangerous)) {
         const previous = merged.at(-1)
-        if (previous && refNumber(range.startRef) === refNumber(previous.endRef) + 1) {
+        const startId = ctx.state.messageIds.byRef.get(range.startRef)
+        const previousEndId = previous && ctx.state.messageIds.byRef.get(previous.endRef)
+        const startIndex = startId && searchContext.rawIndexById.get(startId)
+        const previousEndIndex = previousEndId && searchContext.rawIndexById.get(previousEndId)
+        if (
+            previous &&
+            typeof startIndex === "number" &&
+            typeof previousEndIndex === "number" &&
+            startIndex === previousEndIndex + 1
+        ) {
             const previousEffective = previous.effectiveTokens ?? previous.tokens
             previous.endRef = range.endRef
             previous.count += range.count
@@ -119,7 +127,7 @@ export function armBestSmartPlan(
     targetChars = ctx.config.compress.minCompressRange,
 ): SmartCompressionPlan | undefined {
     const candidates: Array<SmartCompressionPlan & { rawStart: number }> = []
-    for (const range of mergeAdjacentSafeRanges(ranges)) {
+    for (const range of mergeAdjacentSafeRanges(ranges, searchContext, ctx)) {
         const selection = filteredSelection(range.startRef, range.endRef, searchContext, ctx)
         if (!selection || selection.messageIds.length === 0) continue
         if (visibleMessageIds && !selection.messageIds.every((id) => visibleMessageIds.has(id)))
