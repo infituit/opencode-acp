@@ -27,11 +27,12 @@ import { getRequestInput, isHostInput } from "../messages/query"
 async function findV2ToolName(
     ctx: Context,
     sessionID: string,
+    assistantMessageID: string,
     callID: string,
 ): Promise<string | undefined> {
     const messages = await ctx.session.context({ sessionID })
-    for (const message of messages as Array<{ type?: string; content?: unknown[] }>) {
-        if (message.type !== "assistant") continue
+    for (const message of messages as Array<{ id?: string; type?: string; content?: unknown[] }>) {
+        if (message.type !== "assistant" || message.id !== assistantMessageID) continue
         for (const part of message.content ?? []) {
             if (!part || typeof part !== "object") continue
             const tool = part as { type?: string; id?: string; name?: string }
@@ -249,10 +250,23 @@ export const AcpV2Plugin = Plugin.define({
 
         const abort = new AbortController()
         const eventHandler = createEventHandler(registry, logger)
-        const toolNames = new Map<string, string>()
+        const toolNames = new Map<string, { sessionID: string; name: string }>()
+        const rememberToolName = (key: string, sessionID: string, name: string) => {
+            if (abort.signal.aborted) return
+            // FIFO eviction bounds abandoned calls; an evicted name can still be looked up.
+            if (!toolNames.has(key) && toolNames.size >= 4096) {
+                const oldest = toolNames.keys().next().value
+                if (oldest !== undefined) toolNames.delete(oldest)
+            }
+            toolNames.set(key, { sessionID, name })
+        }
         void (async () => {
             for await (const event of ctx.event.subscribe({ signal: abort.signal })) {
+                if (abort.signal.aborted) break
                 if (event.type === "session.idle" || event.type === "session.deleted") {
+                    for (const [key, tool] of toolNames) {
+                        if (tool.sessionID === event.data.sessionID) toolNames.delete(key)
+                    }
                     await eventHandler({
                         event: {
                             type: event.type,
@@ -263,6 +277,7 @@ export const AcpV2Plugin = Plugin.define({
                 }
 
                 if (
+                    event.type !== "session.tool.input.started" &&
                     event.type !== "session.tool.called" &&
                     event.type !== "session.tool.success" &&
                     event.type !== "session.tool.failed"
@@ -270,36 +285,64 @@ export const AcpV2Plugin = Plugin.define({
                     continue
                 }
 
-                const name =
-                    toolNames.get(event.data.id) ??
-                    (await findV2ToolName(ctx, event.data.sessionID, event.data.id))
-                if (name !== "acp_compress") continue
-                toolNames.set(event.data.id, name)
+                const { sessionID, assistantMessageID, id } = event.data
+                const key = JSON.stringify([sessionID, assistantMessageID, id])
+                if (event.type === "session.tool.input.started") {
+                    rememberToolName(key, sessionID, event.data.name)
+                    continue
+                }
 
-                const status =
-                    event.type === "session.tool.called"
-                        ? "pending"
-                        : event.type === "session.tool.success"
-                          ? "completed"
-                          : "error"
-                await eventHandler({
-                    event: {
-                        type: "message.part.updated",
-                        time: event.created,
-                        properties: {
-                            part: {
-                                type: "tool",
-                                tool: name,
-                                callID: event.data.id,
-                                messageID: event.data.assistantMessageID,
-                                state: { status, time: { completed: event.created } },
+                const terminal = event.type !== "session.tool.called"
+                try {
+                    let name = toolNames.get(key)?.name
+                    if (name === undefined) {
+                        try {
+                            name = await findV2ToolName(ctx, sessionID, assistantMessageID, id)
+                        } catch {
+                            // History errors can contain provider response bodies.
+                            logger.warn("Failed to resolve tool name", {
+                                sessionID,
+                                assistantMessageID,
+                                callID: id,
+                                reason: "history_lookup_failed",
+                            })
+                            continue
+                        }
+                        if (abort.signal.aborted) break
+                        if (name !== undefined) rememberToolName(key, sessionID, name)
+                    }
+                    if (name !== "acp_compress") continue
+
+                    const status =
+                        event.type === "session.tool.called"
+                            ? "pending"
+                            : event.type === "session.tool.success"
+                              ? "completed"
+                              : "error"
+                    await eventHandler({
+                        event: {
+                            type: "message.part.updated",
+                            time: event.created,
+                            properties: {
+                                part: {
+                                    type: "tool",
+                                    tool: name,
+                                    callID: id,
+                                    messageID: assistantMessageID,
+                                    state: { status, time: { completed: event.created } },
+                                },
                             },
                         },
-                    },
-                })
+                    })
+                } finally {
+                    if (terminal) toolNames.delete(key)
+                }
             }
         })()
 
-        return () => abort.abort()
+        return () => {
+            abort.abort()
+            toolNames.clear()
+        }
     },
 })

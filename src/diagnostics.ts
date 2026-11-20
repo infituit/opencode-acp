@@ -52,6 +52,20 @@ export class ContextDiagnostic {
         blocks?: number
         activeBlocks?: number
     } = {}
+    readonly tokens = {
+        usageCalls: 0,
+        providerUsage: 0,
+        compactionReset: 0,
+        fullHistoryFallback: 0,
+        fallbackMessages: 0,
+        tokenizerCalls: 0,
+        tokenizerChars: 0,
+        tokenizerMs: 0,
+        tokenizerErrors: 0,
+        cacheHits: 0,
+        cacheMisses: 0,
+        cacheEvictions: 0,
+    }
     private readonly lanes = new Map<string, StageTimeline>()
     private status: "ok" | "skipped" | "error" = "ok"
     private skipReason?: string
@@ -109,6 +123,10 @@ export class ContextDiagnostic {
                         failedStage: this.failedStage,
                         totalMs: milliseconds(performance.now() - this.startedAt),
                         counts: this.counts,
+                        tokens: {
+                            ...this.tokens,
+                            tokenizerMs: milliseconds(this.tokens.tokenizerMs),
+                        },
                         stageMs: Object.fromEntries(
                             [...this.lanes].map(([name, lane]) => [name, lane.snapshot()]),
                         ),

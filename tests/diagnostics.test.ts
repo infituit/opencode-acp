@@ -47,33 +47,78 @@ test("one completion with exclusive stages; finish is idempotent", async () => {
         ) < 5,
     )
     assert.deepEqual(Object.keys(record.stageMs.transform), ["filters", "tokens"])
-    assert.equal(record.tokens, undefined, "uncollected counters must not masquerade as zero")
+    assert.deepEqual(record.tokens, {
+        usageCalls: 0,
+        providerUsage: 0,
+        compactionReset: 0,
+        fullHistoryFallback: 0,
+        fallbackMessages: 0,
+        tokenizerCalls: 0,
+        tokenizerChars: 0,
+        tokenizerMs: 0,
+        tokenizerErrors: 0,
+        cacheHits: 0,
+        cacheMisses: 0,
+        cacheEvictions: 0,
+    })
 })
 
 test("async concurrent requests and late continuations are isolated", async () => {
     const { logger, records } = capture()
-    const late: Array<() => unknown> = []
+    const late: Promise<void>[] = []
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+        release = resolve
+    })
     await Promise.all(
         ["a", "b"].map((session) =>
             diagnoseContext(logger, session, async (request) => {
                 assert.equal(currentDiagnostic(), request)
+                assert.equal(request!.tokens.usageCalls, 0)
+                const amount = session === "a" ? 1 : 2
+                currentDiagnostic()!.tokens.usageCalls += amount
                 await setImmediate()
                 assert.equal(currentDiagnostic()?.sessionId, session)
-                request!.counts.inputMessages = session === "a" ? 1 : 2
-                late.push(() => request!.active)
+                request!.counts.inputMessages = amount
+                currentDiagnostic()!.tokens.fullHistoryFallback += amount
+                currentDiagnostic()!.tokens.tokenizerCalls += amount
+                currentDiagnostic()!.tokens.tokenizerChars += amount * 10
+                currentDiagnostic()!.tokens.tokenizerMs += 1.23456
+                currentDiagnostic()!.tokens.cacheHits += amount
+                late.push(
+                    (async () => {
+                        await gate
+                        assert.equal(request!.active, false)
+                        assert.equal(currentDiagnostic(), undefined)
+                        const diagnostic = currentDiagnostic()
+                        if (diagnostic) diagnostic.tokens.cacheEvictions++
+                    })(),
+                )
             }),
         ),
     )
     assert.equal(new Set(records.map((record) => record.data.traceId)).size, 2)
-    assert.equal(
-        records.find((record) => record.data.sessionId === "a")!.data.counts.inputMessages,
-        1,
-    )
-    assert.equal(
-        records.find((record) => record.data.sessionId === "b")!.data.counts.inputMessages,
-        2,
-    )
-    assert.ok(late.every((callback) => callback() === false))
+    for (const [session, amount] of [
+        ["a", 1],
+        ["b", 2],
+    ] as const) {
+        const record = records.find((record) => record.data.sessionId === session)!.data
+        assert.equal(record.counts.inputMessages, amount)
+        assert.equal(record.tokens.usageCalls, amount)
+        assert.equal(record.tokens.fullHistoryFallback, amount)
+        assert.equal(record.tokens.tokenizerCalls, amount)
+        assert.equal(record.tokens.tokenizerChars, amount * 10)
+        assert.equal(record.tokens.tokenizerMs, 1.235)
+        assert.equal(record.tokens.cacheHits, amount)
+        assert.equal(record.tokens.cacheEvictions, 0)
+    }
+    await diagnoseContext(logger, "next", async (request) => {
+        release()
+        await Promise.all(late)
+        assert.equal(currentDiagnostic(), request)
+        assert.ok(Object.values(request!.tokens).every((value) => value === 0))
+    })
+    assert.ok(records.every((record) => record.data.tokens.cacheEvictions === 0))
 })
 
 test("skips and errors retain the original result and deepest failure stage", async () => {

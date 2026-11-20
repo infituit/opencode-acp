@@ -17,7 +17,10 @@ const TOKEN_KEYS = [
     "tokenizerErrors",
 ] as const
 
+const CACHE_KEYS = ["cacheHits", "cacheMisses", "cacheEvictions"] as const
+
 type TokenCounters = Record<(typeof TOKEN_KEYS)[number], number>
+type CacheCounters = Record<(typeof CACHE_KEYS)[number], number>
 type Lane = "context" | "transform"
 
 export interface ContextDiagnosticRecord {
@@ -32,7 +35,7 @@ export interface ContextDiagnosticRecord {
     totalMs: number
     counts: Record<string, number>
     stageMs: Partial<Record<Lane, Record<string, number>>>
-    tokens?: TokenCounters
+    tokens?: TokenCounters & Partial<CacheCounters>
     version: string
 }
 
@@ -95,14 +98,16 @@ export function parseDiagnosticLine(line: string): DiagnosticLineResult {
     ) {
         return { kind: "malformed" }
     }
-    if (
-        payload.tokens !== undefined &&
-        (!isObject(payload.tokens) ||
-            !TOKEN_KEYS.every((key) =>
-                isNonnegativeNumber((payload.tokens as Record<string, unknown>)[key]),
-            ))
-    ) {
-        return { kind: "malformed" }
+    if (payload.tokens !== undefined) {
+        const tokens = payload.tokens
+        if (
+            !isObject(tokens) ||
+            !TOKEN_KEYS.every((key) => isNonnegativeNumber(tokens[key])) ||
+            (CACHE_KEYS.some((key) => key in tokens) &&
+                !CACHE_KEYS.every((key) => isNonnegativeNumber(tokens[key])))
+        ) {
+            return { kind: "malformed" }
+        }
     }
     return { kind: "diagnostic", record: payload as unknown as ContextDiagnosticRecord }
 }
@@ -136,7 +141,11 @@ export class DiagnosticsAggregator {
     private readonly tokenTotals = Object.fromEntries(
         TOKEN_KEYS.map((key) => [key, 0]),
     ) as TokenCounters
+    private readonly cacheTotals = Object.fromEntries(
+        CACHE_KEYS.map((key) => [key, 0]),
+    ) as CacheCounters
     private measuredTokenRecords = 0
+    private measuredCacheRecords = 0
     private malformedLines = 0
     private ignoredLines = 0
     private duplicateRecords = 0
@@ -184,6 +193,10 @@ export class DiagnosticsAggregator {
         if (record.tokens !== undefined) {
             this.measuredTokenRecords++
             for (const key of TOKEN_KEYS) this.tokenTotals[key] += record.tokens[key]
+            if (record.tokens.cacheHits !== undefined) {
+                this.measuredCacheRecords++
+                for (const key of CACHE_KEYS) this.cacheTotals[key] += record.tokens[key]!
+            }
         }
     }
 
@@ -214,6 +227,11 @@ export class DiagnosticsAggregator {
                     this.tokenTotals.usageCalls > 0
                         ? this.tokenTotals.fullHistoryFallback / this.tokenTotals.usageCalls
                         : null,
+                cache: {
+                    measuredRecords: this.measuredCacheRecords,
+                    unavailableRecords: this.durations.length - this.measuredCacheRecords,
+                    totals: this.measuredCacheRecords ? { ...this.cacheTotals } : null,
+                },
             },
             versions: Object.fromEntries(this.versions),
             malformedDiagnosticLines: this.malformedLines,
