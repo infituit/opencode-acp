@@ -1,6 +1,8 @@
 import { SessionState, WithParts } from "./state"
 import type { AssistantMessage, UserMessage } from "./state/message-types"
 import { Logger } from "./logger"
+import { createHash } from "node:crypto"
+import { currentDiagnostic } from "./diagnostics"
 import * as _anthropicTokenizer from "@anthropic-ai/tokenizer"
 const getAnthropicTokenizer = (_anthropicTokenizer.getTokenizer ??
     (_anthropicTokenizer as any).default?.getTokenizer) as typeof _anthropicTokenizer.getTokenizer
@@ -8,8 +10,14 @@ import { getRequestInput, isUserPrompt } from "./messages/query"
 
 // The convenience countTokens API constructs and frees a WASM tokenizer per call.
 let tokenizer: ReturnType<typeof getAnthropicTokenizer> | undefined
+// Retain only fingerprints and exact counts, never historical content. This bound
+// limits shared process memory; histories larger than it can still miss/evict.
+const TOKEN_COUNT_CACHE_LIMIT = 65_536
+const tokenCounts = new Map<string, number>()
 
 export function getCurrentTokenUsage(state: SessionState, messages: WithParts[]): number {
+    const counters = currentDiagnostic()?.tokens
+    if (counters) counters.usageCalls++
     for (let i = messages.length - 1; i >= 0; i--) {
         const msg = messages[i]
         if (msg.info.role !== "assistant") {
@@ -37,9 +45,11 @@ export function getCurrentTokenUsage(state: SessionState, messages: WithParts[])
             (msg.info.time.created < state.lastCompaction ||
                 (msg.info.summary === true && msg.info.time.created === state.lastCompaction))
         ) {
+            if (counters) counters.compactionReset++
             return 0
         }
 
+        if (counters) counters.providerUsage++
         // [FIX Bug 17] Universal token estimation
         // opencode session.ts: adjustedInputTokens = inputTokens - cacheRead - cacheWrite
         // So: input + cacheRead + cacheWrite = prompt_tokens (total input)
@@ -49,6 +59,10 @@ export function getCurrentTokenUsage(state: SessionState, messages: WithParts[])
 
     // [FIX Bug 5] fallback: estimate from all content (text + tool outputs)
     // when no assistant message has token data (first turn or full compaction).
+    if (counters) {
+        counters.fullHistoryFallback++
+        counters.fallbackMessages += messages.length
+    }
     let estimated = 0
     for (const m of messages) {
         estimated += countAllMessageTokens(m)
@@ -129,10 +143,35 @@ export function getCurrentParams(
 
 export function countTokens(text: string): number {
     if (!text) return 0
+    const counters = currentDiagnostic()?.tokens
+    const startedAt = counters ? performance.now() : 0
+    if (counters) {
+        counters.tokenizerCalls++
+        counters.tokenizerChars += text.length
+    }
     try {
+        // Hash raw UTF-16 code units: UTF-8 encoding replaces lone surrogates
+        // and could otherwise conflate distinct strings before normalization.
+        const key = createHash("sha256").update(text, "utf16le").digest("hex")
+        const cached = tokenCounts.get(key)
+        if (cached !== undefined) {
+            tokenCounts.delete(key)
+            tokenCounts.set(key, cached)
+            if (counters) counters.cacheHits++
+            return cached
+        }
+        if (counters) counters.cacheMisses++
         tokenizer ??= getAnthropicTokenizer()
-        return tokenizer.encode(text.normalize("NFKC"), "all").length
+        const count = tokenizer.encode(text.normalize("NFKC"), "all").length
+        if (tokenCounts.size >= TOKEN_COUNT_CACHE_LIMIT) {
+            const oldest = tokenCounts.keys().next().value
+            if (oldest !== undefined) tokenCounts.delete(oldest)
+            if (counters) counters.cacheEvictions++
+        }
+        tokenCounts.set(key, count)
+        return count
     } catch {
+        if (counters) counters.tokenizerErrors++
         try {
             tokenizer?.free()
         } catch {
@@ -140,6 +179,8 @@ export function countTokens(text: string): number {
         }
         tokenizer = undefined
         return Math.round(text.length / 4)
+    } finally {
+        if (counters) counters.tokenizerMs += performance.now() - startedAt
     }
 }
 

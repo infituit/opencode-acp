@@ -46,6 +46,7 @@ test("summary classifies malformed and unsupported data without inventing measur
         unavailableRecords: 1,
         totals: null,
         fallbackRatio: null,
+        cache: { measuredRecords: 0, unavailableRecords: 1, totals: null },
     })
     assert.equal(summarizeDiagnostics([]).totalMs.p95, null)
 })
@@ -100,6 +101,37 @@ test("optional token measurements are aggregated only when present and complete"
         unavailableRecords: 1,
         totals: tokens,
         fallbackRatio: 0.5,
+        cache: { measuredRecords: 0, unavailableRecords: 2, totals: null },
+    })
+    const cache = { cacheHits: 12, cacheMisses: 8, cacheEvictions: 3 }
+    const mixed = summarizeDiagnostics([
+        line(record({ traceId: "old", tokens })),
+        line(record({ traceId: "new", tokens: { ...tokens, ...cache } })),
+        line(record({ traceId: "unmeasured" })),
+    ])
+    assert.equal(mixed.tokenWorkload.measuredRecords, 2)
+    assert.equal(mixed.tokenWorkload.totals?.usageCalls, 8)
+    assert.deepEqual(mixed.tokenWorkload.cache, {
+        measuredRecords: 1,
+        unavailableRecords: 2,
+        totals: cache,
+    })
+    for (const counters of [
+        { ...tokens, cacheHits: 0 },
+        { ...tokens, cacheHits: 0, cacheMisses: 0 },
+        { ...tokens, ...cache, cacheEvictions: -1 },
+        { ...tokens, ...cache, cacheMisses: "8" },
+        { ...tokens, ...cache, tokenizerChars: null },
+    ]) {
+        assert.equal(parseDiagnosticLine(line(record({ tokens: counters }))).kind, "malformed")
+    }
+    const zero = summarizeDiagnostics([
+        line(record({ tokens: { ...tokens, cacheHits: 0, cacheMisses: 0, cacheEvictions: 0 } })),
+    ])
+    assert.deepEqual(zero.tokenWorkload.cache, {
+        measuredRecords: 1,
+        unavailableRecords: 0,
+        totals: { cacheHits: 0, cacheMisses: 0, cacheEvictions: 0 },
     })
 })
 

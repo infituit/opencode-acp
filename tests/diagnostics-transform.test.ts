@@ -85,6 +85,41 @@ test("real transform preserves output with diagnostics and covers early return a
         })
         assert.deepEqual(traced, plain)
         assert.equal(records.length, 1)
+        const tokens = records[0].tokens
+        assert.deepEqual(
+            Object.keys(tokens).sort(),
+            [
+                "usageCalls",
+                "providerUsage",
+                "compactionReset",
+                "fullHistoryFallback",
+                "fallbackMessages",
+                "tokenizerCalls",
+                "tokenizerChars",
+                "tokenizerMs",
+                "tokenizerErrors",
+                "cacheHits",
+                "cacheMisses",
+                "cacheEvictions",
+            ].sort(),
+        )
+        assert.ok(
+            Object.values<number>(tokens).every((value) => Number.isFinite(value) && value >= 0),
+        )
+        assert.ok(tokens.usageCalls > 0)
+        assert.equal(
+            tokens.usageCalls,
+            tokens.providerUsage + tokens.compactionReset + tokens.fullHistoryFallback,
+        )
+        assert.ok(tokens.fullHistoryFallback > 0)
+        assert.ok(tokens.fallbackMessages > 0)
+        assert.ok(tokens.tokenizerCalls > 0)
+        assert.ok(tokens.tokenizerChars > 0)
+        assert.equal(tokens.tokenizerCalls, tokens.cacheHits + tokens.cacheMisses)
+        const serialized = JSON.stringify(records[0])
+        assert.ok(!serialized.includes("Inspect synthetic output."))
+        assert.ok(!serialized.includes("Synthetic record."))
+        assert.ok(!serialized.includes("fingerprint"))
         assert.equal("syncToolCache" in records[0].stageMs.transform, false)
         for (const stage of [
             "resolveSession",
