@@ -164,12 +164,17 @@ export function prepareExecutableRangePlans(
         }))
         .map((plan) => ({
             ...plan,
-            selection: filterProtectedRecentMessages(
-                plan.selection,
-                searchContext,
-                state,
-                config.compress,
-            ),
+            // Explicit consent bypasses only recent-message soft protection.
+            // Tool/file and last-user protection above still applies.
+            selection:
+                normalizedArgs.dangerous === true
+                    ? plan.selection
+                    : filterProtectedRecentMessages(
+                          plan.selection,
+                          searchContext,
+                          state,
+                          config.compress,
+                      ),
         }))
         .filter((plan) => plan.selection.messageIds.length > 0)
 
