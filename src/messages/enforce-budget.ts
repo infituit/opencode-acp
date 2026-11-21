@@ -2,6 +2,7 @@ import { SessionState, WithParts } from "../state"
 import type { AssistantMessage } from "../state/message-types"
 import type { PluginConfig } from "../config"
 import { Logger } from "../logger"
+import { messageContainsProtectedTool } from "../compress/protected-content"
 import {
     COMPACTED_TOOL_OUTPUT_PLACEHOLDER,
     countAllMessageTokens,
@@ -110,8 +111,9 @@ export function estimateWireTokens(state: SessionState, messages: WithParts[]): 
  * Phase 2: if still over budget, clear the oldest remaining outputs to the
  * standard cleared placeholder.
  *
- * Never touches: the first user message, the last 3 messages, protectedTools,
- * compress-tool outputs (summaries), or already-cleared outputs.
+ * Never touches: the first user message, the last 3 messages, messages matching
+ * protectedTools/protectedFilePatterns, compress-tool outputs (summaries), or
+ * already-cleared outputs.
  *
  * Note: the estimate is computed before message-ID tags and nudge text are
  * injected later in the pipeline; those additions (a few hundred tokens) are
@@ -155,18 +157,25 @@ export function enforceContextBudget(
     }
 
     const protectedIndex = messages.length - PROTECT_RECENT_MESSAGES
-    const protectedTools = new Set(config.compress?.protectedTools ?? [])
 
     const candidates: Array<{ part: any; content: string; tokens: number; index: number }> = []
     for (let mi = 0; mi < protectedIndex; mi++) {
         if (mi === 0 && messages[mi].info.role === "user") continue
         const msg = messages[mi]
+        if (
+            messageContainsProtectedTool(
+                msg,
+                config.compress?.protectedTools ?? [],
+                config.protectedFilePatterns ?? [],
+            )
+        ) {
+            continue
+        }
         const parts = Array.isArray(msg.parts) ? msg.parts : []
         for (const part of parts) {
             if (part?.type !== "tool") continue
             if (part.state?.status !== "completed") continue
             if (part.tool === "acp_compress") continue
-            if (protectedTools.has(part.tool)) continue
 
             const content = extractCompletedToolOutput(part)
             if (content === undefined) continue
