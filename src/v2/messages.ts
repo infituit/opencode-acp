@@ -1,4 +1,28 @@
 import type { WithParts } from "../state"
+import { COMPACTED_TOOL_OUTPUT_PLACEHOLDER } from "../context-usage"
+
+// Assets belong to the host SDK instance (including private fields). Keep the
+// native part out of ACP's serializable file view and never clone its asset.
+const requestMedia = new WeakMap<object, Record<string, unknown>>()
+
+function projectRequestPart(value: unknown): unknown {
+    if (!value || typeof value !== "object") return value
+    const part = value as Record<string, any>
+    if (part.type !== "media") return structuredClone(part)
+    const source = part.media?.source
+    const mime = part.media?.mediaType
+    const url =
+        source?.type === "base64"
+            ? `data:${mime};base64,${source.data}`
+            : source?.type === "bytes" && source.data instanceof Uint8Array
+              ? `data:${mime};base64,${Buffer.from(source.data).toString("base64")}`
+              : source?.type === "url"
+                ? source.url
+                : undefined
+    const file = { type: "file", url, mime, filename: part.filename }
+    requestMedia.set(file, part)
+    return file
+}
 
 type V2Message = {
     id?: string
@@ -43,6 +67,8 @@ function textFromContent(value: unknown): string {
         return value
             .map((item) => {
                 if (typeof item === "string") return item
+                // File payloads must not be counted, truncated or sent as text.
+                if (item && typeof item === "object" && item.type === "file") return ""
                 if (item && typeof item === "object" && "text" in item) {
                     const text = (item as { text?: unknown }).text
                     return typeof text === "string" ? text : ""
@@ -69,6 +95,9 @@ function convertToolPart(part: V2ToolPart): Record<string, unknown> {
             status,
             input: state?.input ?? part.input,
             output: textFromContent(output),
+            ...(Array.isArray(output) && output.some((item) => item?.type === "file")
+                ? { content: structuredClone(output) }
+                : {}),
             ...(state?.metadata?.acpHostInputRefs === true
                 ? { metadata: { acpHostInputRefs: true } }
                 : {}),
@@ -84,10 +113,7 @@ function convertParts(message: V2Message): unknown[] {
         }
         for (const file of message.files ?? []) {
             if (typeof file.data !== "string" || typeof file.mime !== "string") continue
-            const url =
-                file.source?.type === "uri" && file.source.uri
-                    ? file.source.uri
-                    : `data:${file.mime};base64,${file.data}`
+            const url = `data:${file.mime};base64,${file.data}`
             parts.push({ type: "file", url, mime: file.mime })
         }
         return parts
@@ -181,12 +207,14 @@ export function fromV2SessionMessages(
             tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
         }
 
-        const projectedContent = hostInput ? requestInput?.content : undefined
+        // Use the host's complete user projection: attachment text, deduplication
+        // and native media instances have already been resolved there.
+        const projectedContent = requestInput?.content
         const parts =
             typeof projectedContent === "string"
                 ? [{ type: "text", text: projectedContent }]
                 : Array.isArray(projectedContent)
-                  ? projectedContent.map((part) => structuredClone(part))
+                  ? projectedContent.map(projectRequestPart)
                   : convertParts(message)
         result.push({
             info: info as WithParts["info"],
@@ -232,17 +260,36 @@ function toV2ToolCall(part: Record<string, unknown>): Record<string, unknown> {
 
 function toV2ToolResult(part: Record<string, unknown>): Record<string, unknown> {
     const state = (part.state ?? {}) as Record<string, unknown>
-    return {
-        type: "tool-result",
-        ...toolIdentity(part),
-        result: {
-            type: state.status === "error" ? "error" : "text",
-            value: state.output ?? "",
-        },
+    const output = state.output ?? ""
+    let result: Record<string, unknown> = {
+        type: state.status === "error" ? "error" : "text",
+        value: output,
     }
+    if (
+        state.status === "completed" &&
+        Array.isArray(state.content) &&
+        !(state.time as { compacted?: unknown } | undefined)?.compacted &&
+        !(typeof output === "string" && output.startsWith(COMPACTED_TOOL_OUTPUT_PLACEHOLDER))
+    ) {
+        // ACP owns the text view; never restore text that filters or budget
+        // enforcement removed. Files remain structured for provider lowering.
+        const originalText = textFromContent(state.content)
+        const content =
+            output === originalText
+                ? state.content
+                : typeof output === "string" && output.startsWith(originalText)
+                  ? [...state.content, { type: "text", text: output.slice(originalText.length) }]
+                  : [
+                        { type: "text", text: output },
+                        ...state.content.filter((item) => item?.type === "file"),
+                    ]
+        result = { type: "content", value: content }
+    }
+    return { type: "tool-result", ...toolIdentity(part), result }
 }
 
 function toV2Content(part: Record<string, unknown>): Record<string, unknown> | undefined {
+    if (part.type === "file") return requestMedia.get(part)
     if (part.type === "text") {
         return { type: "text", text: typeof part.text === "string" ? part.text : "" }
     }
