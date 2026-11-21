@@ -69,9 +69,9 @@ export function getFilePathsFromParameters(tool: string, parameters: unknown): s
     const paths: string[] = []
     const params = parameters as Record<string, any>
 
-    // 1. apply_patch uses patchText with embedded paths
-    if (tool === "apply_patch" && typeof params.patchText === "string") {
-        const pathRegex = /\*\*\* (?:Add|Delete|Update) File: ([^\n\r]+)/g
+    // Patch headers identify affected files, including both sides of a move.
+    if ((tool === "patch" || tool === "apply_patch") && typeof params.patchText === "string") {
+        const pathRegex = /^\*\*\* (?:(?:Add|Delete|Update) File|Move to): ([^\n\r]+)/gm
         let match
         while ((match = pathRegex.exec(params.patchText)) !== null) {
             paths.push(match[1].trim())
@@ -92,9 +92,12 @@ export function getFilePathsFromParameters(tool: string, parameters: unknown): s
         }
     }
 
-    // 3. Default check for common filePath parameter (read, write, edit, etc)
+    // Common path parameters used by file tools.
     if (typeof params.filePath === "string") {
         paths.push(params.filePath)
+    }
+    if (typeof params.path === "string") {
+        paths.push(params.path)
     }
 
     // Return unique non-empty paths
