@@ -98,10 +98,33 @@ export function archiveSessionImages(
         if (!rawId) continue
         const parts = Array.isArray(message.parts) ? message.parts : []
 
+        const attachments: Array<{ index: string; url: string }> = []
         for (let partIndex = 0; partIndex < parts.length; partIndex++) {
             const part = parts[partIndex]
-            if (part.type !== "file") continue
-            const parsed = parseImageDataUrl(part.url)
+            if (part.type === "file" && typeof part.url === "string") {
+                attachments.push({ index: String(partIndex), url: part.url })
+            } else if (part.type === "tool" && Array.isArray(part.state?.content)) {
+                for (const [contentIndex, item] of part.state.content.entries()) {
+                    if (item?.type !== "file" || typeof item.uri !== "string") continue
+                    // Tool files use data URLs, remote URLs or raw base64. Never
+                    // fetch remote content during compression or archive PDFs/SVGs.
+                    if (typeof item.mime !== "string" || !extForMediaType(item.mime)) continue
+                    if (/^https?:\/\//i.test(item.uri)) continue
+                    let data = item.uri
+                    if (/^data:/i.test(item.uri)) {
+                        const parsed = parseImageDataUrl(item.uri)
+                        if (!parsed || !extForMediaType(parsed.mediaType)) continue
+                        data = parsed.base64
+                    }
+                    if (!data) continue
+                    const url = `data:${item.mime};base64,${data}`
+                    attachments.push({ index: `${partIndex}-c${contentIndex}`, url })
+                }
+            }
+        }
+
+        for (const attachment of attachments) {
+            const parsed = parseImageDataUrl(attachment.url)
             if (!parsed) continue
             const ext = extForMediaType(parsed.mediaType)
             if (!ext) continue
@@ -109,7 +132,7 @@ export function archiveSessionImages(
             // Content identity comes from the base64 payload hash — cheap to
             // compute and identical for identical bytes, so the index check
             // below can skip re-decoding images already archived this session.
-            const fileName = `${sha8(rawId)}-p${partIndex}-${sha8(parsed.base64)}.${ext}`
+            const fileName = `${sha8(rawId)}-p${attachment.index}-${sha8(parsed.base64)}.${ext}`
             const filePath = join(root, fileName)
 
             const existing = state.imageArchive[rawId]?.find((e) => e.path === filePath)
