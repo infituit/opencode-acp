@@ -96,7 +96,8 @@ function buildSchema(maxSummaryLengthHard: number) {
             },
             dangerous: {
                 type: "boolean",
-                description: "Set true only when the most recent messages must be compressed.",
+                description:
+                    "Set true only when recent messages must be compressed. Bypasses recent-message soft protection only; tool/file, last-user, smart-plan and quality checks still apply.",
             },
             acknowledgeRisk: { type: "boolean" },
         },
