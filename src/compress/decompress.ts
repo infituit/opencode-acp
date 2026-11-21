@@ -10,8 +10,10 @@ import { ensureSessionInitialized } from "../state"
 import { saveSessionState } from "../state/persistence"
 import { assignMessageRefs } from "../message-ids"
 import { syncCompressionBlocks } from "../messages"
-import { getCurrentTokenUsage, extractToolContent } from "../context-usage"
-import { resolveEffectiveContextLimit } from "../state/utils"
+import { extractToolContent } from "../context-usage"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { projectDecompression } from "./decompress-budget"
 import {
     fetchSessionMessages,
     buildSearchContext,
@@ -214,7 +216,12 @@ ARGUMENTS:
   /tmp or ~/.cache/opencode/) instead of inflating context. Block(s) stay compressed.
 
 IMPORTANT:
-- Decompressing inflates context. Check context usage before decompressing.
+- Direct restoration is preflighted against the effective context window minus the completion
+  reserve. If it would grow text context beyond this budget, blocks stay compressed and the tool
+  returns an executable toFile call instead. It does not write a file automatically.
+- Prefer toFile for large blocks: search the exported file for relevant keywords, then read a
+  small section with offset and limit. Do not load the entire export back into context.
+- Budget estimates cover visible text and reasoning, not exact provider or native media costs.
 - Message-mode blocks from the same batch (same runId) are restored together.
 - TIER-AWARE: by default, decompressing a multi-tier block restores the PREVIOUS tier's
   summaries (e.g., decompress T2 → T1 summaries visible, not raw messages). Use full:true
@@ -309,14 +316,6 @@ export function createDecompressTool(factoryCtx: ToolFactoryContext): V2ToolInfo
             const ctx = resolveToolContext(factoryCtx, toolCtx.sessionID)
             const { rawMessages } = await prepareDecompressSession(ctx, toolCtx)
 
-            const effectiveLimitBefore = resolveEffectiveContextLimit(ctx.state, ctx.config)
-            const contextUsageBefore = effectiveLimitBefore
-                ? Math.round(
-                      (getCurrentTokenUsage(ctx.state, rawMessages) / effectiveLimitBefore.limit) *
-                          100,
-                  )
-                : undefined
-
             const resolved = resolveTargets(
                 args as Record<string, unknown>,
                 ctx.state,
@@ -382,7 +381,7 @@ export function createDecompressTool(factoryCtx: ToolFactoryContext): V2ToolInfo
 
                 const displayIds = targets.map((t) => `b${t.displayId}`).join(", ")
                 return {
-                    content: `Block(s) ${displayIds} content (${sourceNote}, ${fileContent.length} chars) written to ${targetPath}. Block(s) stay compressed — context unchanged. Use read tool to access specific parts.`,
+                    content: `Block(s) ${displayIds} content (${sourceNote}, ${fileContent.length} chars) written to ${targetPath}. Block(s) stay compressed — context unchanged. Search the exported file for relevant keywords, then use read with offset and limit to inspect specific sections. Do not read the entire file back into context.`,
                 }
             }
 
@@ -423,6 +422,51 @@ export function createDecompressTool(factoryCtx: ToolFactoryContext): V2ToolInfo
                 }
             }
 
+            const projection = projectDecompression(
+                ctx.state,
+                ctx.config,
+                ctx.logger,
+                rawMessages,
+                targets,
+                { full: args.full === true },
+            )
+            if (
+                projection.inputBudget !== undefined &&
+                projection.afterTokens > projection.inputBudget &&
+                projection.afterTokens > projection.beforeTokens
+            ) {
+                const displayIds = targets.map((t) => `b${t.displayId}`).join(", ")
+                const exportArgs = {
+                    ...(typeof args.blockId === "string" && args.blockId.trim() !== ""
+                        ? { blockId: args.blockId }
+                        : { startId: args.startId, endId: args.endId }),
+                    ...(args.full === true ? { full: true } : {}),
+                    toFile: join(tmpdir(), `acp-decompress-b${targets[0]!.displayId}.txt`),
+                }
+                ctx.logger.warn("Decompress deferred: projected context exceeds input budget", {
+                    targetDisplayIds: displayIds,
+                    full: args.full === true,
+                    ...projection,
+                })
+                return {
+                    content:
+                        `Direct context restoration deferred for ${displayIds}: estimated text context would grow ` +
+                        `from ~${formatTokenCount(projection.beforeTokens)} to ~${formatTokenCount(projection.afterTokens)}, ` +
+                        `exceeding the ${projection.inputBudget}-token input budget ` +
+                        `(context window ${projection.contextLimit!.limit}, ${projection.contextLimit!.source}; ` +
+                        `completion reserve ${projection.completionReserve}). ` +
+                        `Native media token costs are not included in this estimate.\n` +
+                        `Block(s) stay compressed; compression state and statistics are unchanged. No file was written.\n\n` +
+                        `Next step: call acp_decompress with toFile to export without inflating context:\n` +
+                        JSON.stringify(exportArgs) +
+                        `\nThen search the exported file for relevant keywords, or use read with offset and limit ` +
+                        `to inspect a small section. Do not read the whole file back into context.` +
+                        (args.full
+                            ? ` You can also omit full:true to restore only the previous tier if it fits.`
+                            : ""),
+                }
+            }
+
             const activeMessagesBefore = snapshotActiveMessages(messagesState)
             const activeBlockIdsBefore = new Set(messagesState.activeBlockIds)
 
@@ -446,14 +490,6 @@ export function createDecompressTool(factoryCtx: ToolFactoryContext): V2ToolInfo
                 ctx.state.stats.totalPruneTokens - restoredTokens,
             )
 
-            const effectiveLimitAfter = resolveEffectiveContextLimit(ctx.state, ctx.config)
-            const contextUsageAfter = effectiveLimitAfter
-                ? Math.round(
-                      (getCurrentTokenUsage(ctx.state, rawMessages) / effectiveLimitAfter.limit) *
-                          100,
-                  )
-                : undefined
-
             await finalizeDecompressSession(ctx)
 
             const restoredContentPreview = buildRestoredContentPreview(
@@ -469,8 +505,16 @@ export function createDecompressTool(factoryCtx: ToolFactoryContext): V2ToolInfo
                 `Decompressed ${headerNoun} ${displayIds}. Restored ${restoredMessageCount} message(s) (~${formatTokenCount(restoredTokens)}).`,
             )
 
-            if (contextUsageBefore !== undefined && contextUsageAfter !== undefined) {
-                lines.push(`Context usage: ${contextUsageBefore}% → ${contextUsageAfter}%.`)
+            if (projection.contextLimit) {
+                const before = Math.round(
+                    (projection.beforeTokens / projection.contextLimit.limit) * 100,
+                )
+                const after = Math.round(
+                    (projection.afterTokens / projection.contextLimit.limit) * 100,
+                )
+                lines.push(
+                    `Context usage: ${before}% → ${after}% (estimated text; excludes native media costs).`,
+                )
             }
 
             if (reactivatedBlockIds.length > 0) {
