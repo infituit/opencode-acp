@@ -1,6 +1,6 @@
 import type { CompressionTarget } from "../commands/compression-targets"
 import type { PluginConfig } from "../config"
-import { countAllMessageTokens, countTokens } from "../context-usage"
+import { countAllMessageTokens } from "../context-usage"
 import type { Logger } from "../logger"
 import { DEFAULT_COMPLETION_RESERVE_TOKENS } from "../messages/enforce-budget"
 import { applyCompressOverrides, getModelInfo } from "../messages/inject/utils"
@@ -33,13 +33,6 @@ function countVisibleTokens(
     let total = state.systemPromptTokens ?? 0
     for (const message of visible) {
         total += countAllMessageTokens(message)
-        // The shared content counter excludes reasoning, but restored reasoning
-        // also occupies the request. Native media costs remain outside this estimate.
-        for (const part of message.parts) {
-            if (part.type === "reasoning" && typeof part.text === "string") {
-                total += countTokens(part.text)
-            }
-        }
     }
     return total
 }
