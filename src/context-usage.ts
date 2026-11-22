@@ -252,15 +252,17 @@ export function countMessageTextTokens(msg: WithParts): number {
 export function countAllMessageTokens(msg: WithParts): number {
     const parts = Array.isArray(msg.parts) ? msg.parts : []
     const texts: string[] = []
+    let reasoningTokens = 0
     for (const part of parts) {
         if (part.type === "text") {
             texts.push(part.text)
+        } else if (part.type === "reasoning" && typeof part.text === "string") {
+            reasoningTokens += countTokens(part.text)
         } else {
             texts.push(...extractToolContent(part))
         }
     }
-    if (texts.length === 0) return 0
-    return estimateTokensBatch(texts)
+    return estimateTokensBatch(texts) + reasoningTokens
 }
 
 export function countMessageCharacters(msg: WithParts): number {
