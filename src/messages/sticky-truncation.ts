@@ -15,11 +15,14 @@
  * truncates (or clears) a tool output, the result is frozen in
  * `state.stickyTruncations` keyed by tool call ID and replayed verbatim on
  * every later request BEFORE the guards run. A→B→B→B — the truncated form
- * never grows back. The full content stays in the session store (and on
- * disk), so nothing is lost; the wire view is simply stable.
+ * never grows back unless current tool/file protection excludes its message
+ * from replay. The full content stays in the session store (and on disk), so
+ * nothing is lost; unprotected wire output remains stable.
  */
 
 import { extractCompletedToolOutput } from "../context-usage"
+import type { PluginConfig } from "../config"
+import { messageContainsProtectedTool } from "../compress/protected-content"
 import type { Logger } from "../logger"
 import type { SessionState, WithParts } from "../state"
 
@@ -64,26 +67,37 @@ export function applyStickyTruncations(
     state: SessionState,
     messages: WithParts[],
     logger: Logger,
+    config: PluginConfig,
 ): void {
     const frozen = state.stickyTruncations
     if (Object.keys(frozen).length === 0) return
 
     let replayed = 0
     const seen = new Set<string>()
-    for (const part of collectToolParts(messages)) {
-        const callID = typeof part.callID === "string" ? part.callID : undefined
-        if (!callID) continue
-        seen.add(callID)
-        const recorded = frozen[callID]
-        if (recorded === undefined) continue
-        if (!part.state) continue // stateless part — cannot be a guard candidate
-        // [#485 review] Overwrite non-string outputs too: the guards
-        // stringify before truncating, so the frozen form is a string while
-        // the pristine per-request copy is whatever the store holds. Skipping
-        // non-strings would let the exact A→B→A flip survive for that shape.
-        if (part.state.output === recorded) continue
-        part.state.output = recorded
-        replayed++
+    for (const message of messages) {
+        const protectedMessage = messageContainsProtectedTool(
+            message,
+            config.compress?.protectedTools ?? [],
+            config.protectedFilePatterns ?? [],
+        )
+        for (const part of collectToolParts([message])) {
+            const callID = typeof part.callID === "string" ? part.callID : undefined
+            if (!callID) continue
+            seen.add(callID)
+            // Current protection wins over an older frozen truncation for the
+            // whole message, while retaining entries for calls still present.
+            if (protectedMessage) continue
+            const recorded = frozen[callID]
+            if (recorded === undefined) continue
+            if (!part.state) continue // stateless part — cannot be a guard candidate
+            // [#485 review] Overwrite non-string outputs too: the guards
+            // stringify before truncating, so the frozen form is a string while
+            // the pristine per-request copy is whatever the store holds. Skipping
+            // non-strings would let the exact A→B→A flip survive for that shape.
+            if (part.state.output === recorded) continue
+            part.state.output = recorded
+            replayed++
+        }
     }
 
     for (const callID of Object.keys(frozen)) {

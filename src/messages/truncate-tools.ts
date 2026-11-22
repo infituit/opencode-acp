@@ -3,6 +3,7 @@ import type { PluginConfig } from "../config"
 import { Logger } from "../logger"
 import { getCurrentTokenUsage, countTokens, extractCompletedToolOutput } from "../context-usage"
 import { resolveEffectiveContextLimit } from "../state/utils"
+import { messageContainsProtectedTool } from "../compress/protected-content"
 
 const TRUNCATION_MARKER = "[truncated for context space"
 const MIN_OUTPUT_TOKENS = 1000
@@ -107,6 +108,15 @@ export function truncateLargeToolOutputs(
         if (mi >= protectedIndex) break
 
         const msg = messages[mi]
+        if (
+            messageContainsProtectedTool(
+                msg,
+                config.compress?.protectedTools ?? [],
+                config.protectedFilePatterns ?? [],
+            )
+        ) {
+            continue
+        }
         const parts = Array.isArray(msg.parts) ? msg.parts : []
 
         for (let pi = 0; pi < parts.length; pi++) {
