@@ -10,8 +10,10 @@ import { createSessionState, type SessionStateRegistry } from "../src/state"
 import { getConfig } from "../src/config"
 import { PromptStore } from "../src/prompts/store"
 import { fromV2SessionMessages } from "../src/v2/messages"
+import { getCurrentTokenUsage } from "../src/context-usage"
+import { setImmediate as nextTurn } from "node:timers/promises"
 
-test("real transform preserves output with diagnostics and covers early return and failure", async () => {
+test("real transform preserves output with diagnostics and covers early return and failure", async (t) => {
     const sandbox = await mkdtemp(join(tmpdir(), "acp-transform-test-"))
     const keys = ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "OPENCODE_CONFIG_DIR"] as const
     const previous = keys.map((key) => process.env[key])
@@ -51,6 +53,11 @@ test("real transform preserves output with diagnostics and covers early return a
                 ],
                 "session",
             )
+        let completed: Record<string, unknown> | undefined
+        logger.info = (message, metadata) => {
+            if (message === "Chat transform complete")
+                completed = metadata as Record<string, unknown>
+        }
         const fixture = (isSubAgent = false, failure?: Error) => {
             const state = createSessionState()
             state.sessionId = "session"
@@ -149,6 +156,34 @@ test("real transform preserves output with diagnostics and covers early return a
         )
         assert.equal(records.at(-1).failedStage, "transform.resolveSession")
         assert.equal(records.at(-1).status, "error")
+
+        // Force every count to yield, including the count inside nudge injection.
+        let clock = 0
+        t.mock.method(performance, "now", () => (clock += 10))
+        config.compress.maxContextLimit = 1
+        config.compress.minContextLimit = 1
+        config.compress.emergencyThresholdPercent = 0
+        config.compress.preserveRecentMessages = 0
+        config.compress.preserveRecentTokens = 0
+        config.compress.minCompressRange = 1
+        config.compress.protectedTools = []
+        const nudged = { messages: messages() }
+        let heartbeatRan = false
+        const heartbeat = nextTurn().then(() => {
+            heartbeatRan = true
+        })
+        completed = undefined
+        await diagnoseContext(logger, "session", async () => fixture()({}, nudged))
+        assert.ok(heartbeatRan, "queued work ran before transform completion")
+        await heartbeat
+        assert.equal(completed?.nudged, true)
+        assert.ok(JSON.stringify(nudged).includes("Context limit reached"))
+        assert.equal(
+            completed?.postTokens,
+            getCurrentTokenUsage(createSessionState(), nudged.messages),
+            "final count includes the completed nudge and metadata projection",
+        )
+        assert.equal(records.at(-1).status, "ok")
     } finally {
         keys.forEach((key, i) => {
             if (previous[i] === undefined) delete process.env[key]

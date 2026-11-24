@@ -86,7 +86,7 @@ function createSuffixMessage(messages: WithParts[]): WithParts | null {
     return synthetic
 }
 
-export const injectCompressNudges = (
+export const injectCompressNudges = async (
     state: SessionState,
     config: PluginConfig,
     logger: Logger,
@@ -96,7 +96,7 @@ export const injectCompressNudges = (
     debugNotify?: (text: string) => void,
     preCompressTokens?: number,
     candidateMessages?: WithParts[],
-): void => {
+): Promise<void> => {
     if (compressPermission(state, config) === "deny") {
         return
     }
@@ -114,13 +114,8 @@ export const injectCompressNudges = (
     // > global).
     config = applyCompressOverrides(config, providerId, modelId)
 
-    const { overMaxLimit, overMinLimit, currentTokens, modelContextLimit } = isContextOverLimits(
-        config,
-        state,
-        providerId,
-        modelId,
-        messages,
-    )
+    const { overMaxLimit, overMinLimit, currentTokens, modelContextLimit } =
+        await isContextOverLimits(config, state, providerId, modelId, messages)
 
     const lastUserIdx = messages.findLastIndex(isUserPrompt)
     const currentTurnStart = lastUserIdx >= 0 ? lastUserIdx + 1 : 0

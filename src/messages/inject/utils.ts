@@ -21,7 +21,7 @@ import {
 import {
     countMessageCharacters,
     estimateSystemPromptTokens,
-    getCurrentTokenUsage,
+    getCurrentTokenUsageAsync,
 } from "../../context-usage"
 import {
     appendToTextPart,
@@ -172,7 +172,7 @@ export function resolveContextTokenLimit(
     return parseLimitValue(globalLimit)
 }
 
-export function isContextOverLimits(
+export async function isContextOverLimits(
     config: PluginConfig,
     state: SessionState,
     providerId: string | undefined,
@@ -194,7 +194,7 @@ export function isContextOverLimits(
             ? undefined
             : resolvedMaxContextLimit + summaryTokenExtension
     const minContextLimit = resolveContextTokenLimit(config, state, providerId, modelId, "min")
-    const currentTokens = getCurrentTokenUsage(state, messages)
+    const currentTokens = await getCurrentTokenUsageAsync(state, messages)
 
     let overMaxLimit = maxContextLimit === undefined ? false : currentTokens > maxContextLimit
     const overMinLimit = minContextLimit === undefined ? false : currentTokens >= minContextLimit

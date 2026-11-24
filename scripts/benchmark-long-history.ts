@@ -103,37 +103,60 @@ try {
     })
     const run = async () => {
         const started = performance.now()
+        let lastTurn = started
+        let maxTurnDelayMs = 0
+        let eventLoopTurns = 0
+        const heartbeat = () => {
+            const now = performance.now()
+            maxTurnDelayMs = Math.max(maxTurnDelayMs, now - lastTurn)
+            lastTurn = now
+            eventLoopTurns++
+            pendingHeartbeat = setImmediate(heartbeat)
+        }
+        let pendingHeartbeat = setImmediate(heartbeat)
         const results = []
         const counters = []
-        for (const session of sessions) {
-            const state = createSessionState()
-            state.sessionId = session.id
-            state.storageDir = sandbox
-            const registry = {
-                getOrCreate: async () => state,
-                resolveModelLimit: () => 10_000_000,
+        try {
+            for (const session of sessions) {
+                const state = createSessionState()
+                state.sessionId = session.id
+                state.storageDir = sandbox
+                const registry = {
+                    getOrCreate: async () => state,
+                    resolveModelLimit: () => 10_000_000,
+                }
+                const handler = createChatMessageTransformHandler(
+                    {},
+                    registry,
+                    logger,
+                    config,
+                    new PromptStore(logger, sandbox),
+                    { global: undefined, agents: {} },
+                )
+                const output = { messages: structuredClone(session.messages) }
+                await diagnoseContext(logger, session.id, async (diagnostic: any) => {
+                    diagnostic.timeline("context", "transformMessages")
+                    await handler({}, output)
+                })
+                results.push({
+                    output,
+                    refs: [...state.messageIds.byRawId],
+                    prune: [...state.prune.messages.byMessageId],
+                })
+                counters.push(record?.tokens ?? null)
             }
-            const handler = createChatMessageTransformHandler(
-                {},
-                registry,
-                logger,
-                config,
-                new PromptStore(logger, sandbox),
-                { global: undefined, agents: {} },
-            )
-            const output = { messages: structuredClone(session.messages) }
-            await diagnoseContext(logger, session.id, async (diagnostic: any) => {
-                diagnostic.timeline("context", "transformMessages")
-                await handler({}, output)
-            })
-            results.push({
-                output,
-                refs: [...state.messageIds.byRawId],
-                prune: [...state.prune.messages.byMessageId],
-            })
-            counters.push(record?.tokens ?? null)
+            const finished = performance.now()
+            maxTurnDelayMs = Math.max(maxTurnDelayMs, finished - lastTurn)
+            return {
+                ms: round(finished - started),
+                maxTurnDelayMs: round(maxTurnDelayMs),
+                eventLoopTurns,
+                hash: hash(results),
+                counters,
+            }
+        } finally {
+            clearImmediate(pendingHeartbeat)
         }
-        return { ms: round(performance.now() - started), hash: hash(results), counters }
     }
     const transformCold = await run()
     const transformWarm = []
