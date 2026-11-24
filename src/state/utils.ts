@@ -69,16 +69,44 @@ export function serializePruneMessagesState(
     }
 }
 
+export async function getSessionRelations(
+    client: any,
+    sessionID: string,
+): Promise<{
+    parentID?: string
+    fork?: { sessionID: string; boundary: { type: "before" | "through"; messageID: string } }
+}> {
+    try {
+        const result = await client.session.get({ sessionID })
+        const fork = result?.fork
+        return {
+            parentID: typeof result?.parentID === "string" ? result.parentID : undefined,
+            fork:
+                typeof fork?.sessionID === "string" &&
+                fork.sessionID.length > 0 &&
+                fork.sessionID !== sessionID &&
+                (fork.boundary?.type === "before" || fork.boundary?.type === "through") &&
+                typeof fork.boundary.messageID === "string" &&
+                fork.boundary.messageID.length > 0
+                    ? {
+                          sessionID: fork.sessionID,
+                          boundary: {
+                              type: fork.boundary.type,
+                              messageID: fork.boundary.messageID,
+                          },
+                      }
+                    : undefined,
+        }
+    } catch {
+        return {}
+    }
+}
+
 export async function getSessionParentId(
     client: any,
     sessionID: string,
 ): Promise<string | undefined> {
-    try {
-        const result = await client.session.get({ sessionID })
-        return typeof result?.parentID === "string" ? result.parentID : undefined
-    } catch (error: any) {
-        return undefined
-    }
+    return (await getSessionRelations(client, sessionID)).parentID
 }
 
 export async function isSubAgentSession(client: any, sessionID: string): Promise<boolean> {
