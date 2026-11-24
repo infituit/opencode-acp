@@ -123,4 +123,8 @@ baseline 使用另一个相同 package 版本、已安装依赖的 checkout。`-
 
 脚本会断言同一进程内每次 warm 的 hash 与该 operation 的 cold 一致；比较不同 checkout 时，也应确认 `exact-count` 的计数向量 hash 和 `transform` 的输出/refs/prune 组合 hash 一致，再解读耗时变化。`cold` 仅表示该 operation 的首次运行，不保证 tokenizer 或共享 cache 从未被先前 operation 使用，更不是进程冷启动时间。
 
+`transform` 同时报告 `eventLoopTurns` 和 `maxTurnDelayMs`：前者是回放期间 `setImmediate` heartbeat 获得执行的次数，后者是相邻 heartbeat（含运行起止边界）之间最大的 elapsed time。这用于对照协作式调度前后的事件循环响应性，不是独占 CPU 时间或固定延迟上限；其他异步阶段也会让 heartbeat 执行。
+
+请求路径的完整历史计数使用约 8 ms 的目标时间片，在消息之间让出事件循环；计数、缓存及失败回退与同步入口相同，nudge 和最终预算检查仍等待各自当前投影的计数完成。时间片不是硬上限：单条超大消息的编码、序列化，以及其他同步阶段仍可能连续阻塞，历史 usage、fork 恢复和可选 emergency guards 的同步计数不在本轮改动范围内。协作调度用于改善响应性，不保证缩短总耗时。
+
 该回放固定 wall clock，使用合成内容和 stubbed diagnostic sink，不测 provider/network latency 或日志落盘耗时，也不覆盖真实流量分布、进程间 cache 共享或 V2 event subscription 的性能。结果用于同一环境下的可重复对照，不是生产 latency、生产性能提升或诊断开销上限的保证。

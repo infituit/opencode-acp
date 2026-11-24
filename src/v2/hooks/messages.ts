@@ -42,7 +42,7 @@ import {
 } from "../../state"
 import { cacheSystemPromptTokens } from "../../ui/utils"
 import { runBatchCleanup } from "../../gc/merge"
-import { getCurrentTokenUsage } from "../../context-usage"
+import { getCurrentTokenUsageAsync } from "../../context-usage"
 import { currentDiagnostic } from "../../diagnostics"
 import { recordVisibleMessages } from "../../compress/smart-plan"
 
@@ -288,7 +288,7 @@ export function createChatMessageTransformHandler(
             }
             checkpoint("prePruneTokens")
             buildToolIdList(state, output.messages)
-            const prePruneTokens = getCurrentTokenUsage(state, output.messages)
+            const prePruneTokens = await getCurrentTokenUsageAsync(state, output.messages)
             checkpoint("batchCleanup")
             // Cleanup changes block metadata, not the message projection being counted.
             const batchResult = runBatchCleanup(
@@ -314,7 +314,7 @@ export function createChatMessageTransformHandler(
             assignMessageRefs(state, output.messages)
             const compressionPriorities = buildPriorityMap(config, state, output.messages)
             prompts.reload()
-            injectCompressNudges(
+            await injectCompressNudges(
                 state,
                 config,
                 logger,
@@ -399,7 +399,7 @@ export function createChatMessageTransformHandler(
                 recordVisibleMessages(state.sessionId, output.messages)
             }
             checkpoint("postTokens")
-            const postTokens = getCurrentTokenUsage(state, output.messages)
+            const postTokens = await getCurrentTokenUsageAsync(state, output.messages)
             checkpoint("budgetGuard")
             // [FIX #346] Hard guard: if the post-transform context still exceeds
             // the model's real request budget (window minus system prompt + tool

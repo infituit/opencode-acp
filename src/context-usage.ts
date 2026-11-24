@@ -2,6 +2,7 @@ import { SessionState, WithParts } from "./state"
 import type { AssistantMessage, UserMessage } from "./state/message-types"
 import { Logger } from "./logger"
 import { createHash } from "node:crypto"
+import { setImmediate as yieldToEventLoop } from "node:timers/promises"
 import { currentDiagnostic } from "./diagnostics"
 import * as _anthropicTokenizer from "@anthropic-ai/tokenizer"
 const getAnthropicTokenizer = (_anthropicTokenizer.getTokenizer ??
@@ -15,7 +16,9 @@ let tokenizer: ReturnType<typeof getAnthropicTokenizer> | undefined
 const TOKEN_COUNT_CACHE_LIMIT = 65_536
 const tokenCounts = new Map<string, number>()
 
-export function getCurrentTokenUsage(state: SessionState, messages: WithParts[]): number {
+// Both consumers run the same accounting path. Only the request-time consumer
+// yields; synchronous commands and guards retain their existing contract.
+function* currentTokenUsage(state: SessionState, messages: WithParts[]): Generator<number> {
     const counters = currentDiagnostic()?.tokens
     if (counters) counters.usageCalls++
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -46,7 +49,7 @@ export function getCurrentTokenUsage(state: SessionState, messages: WithParts[])
                 (msg.info.summary === true && msg.info.time.created === state.lastCompaction))
         ) {
             if (counters) counters.compactionReset++
-            return 0
+            return
         }
 
         if (counters) counters.providerUsage++
@@ -54,7 +57,8 @@ export function getCurrentTokenUsage(state: SessionState, messages: WithParts[])
         // opencode session.ts: adjustedInputTokens = inputTokens - cacheRead - cacheWrite
         // So: input + cacheRead + cacheWrite = prompt_tokens (total input)
         // Total context usage = prompt_tokens + output + reasoning
-        return input + cacheRead + cacheWrite + output + reasoning
+        yield input + cacheRead + cacheWrite + output + reasoning
+        return
     }
 
     // [FIX Bug 5] fallback: estimate from all content (text + tool outputs)
@@ -63,11 +67,32 @@ export function getCurrentTokenUsage(state: SessionState, messages: WithParts[])
         counters.fullHistoryFallback++
         counters.fallbackMessages += messages.length
     }
-    let estimated = 0
-    for (const m of messages) {
-        estimated += countAllMessageTokens(m)
+    for (const message of messages) {
+        yield countAllMessageTokens(message)
     }
-    return estimated
+}
+
+export function getCurrentTokenUsage(state: SessionState, messages: WithParts[]): number {
+    let total = 0
+    for (const tokens of currentTokenUsage(state, messages)) total += tokens
+    return total
+}
+
+/** Exact request-time accounting, with cooperative scheduling between messages. */
+export async function getCurrentTokenUsageAsync(
+    state: SessionState,
+    messages: WithParts[],
+): Promise<number> {
+    let total = 0
+    let deadline = performance.now() + 8
+    for (const tokens of currentTokenUsage(state, messages)) {
+        total += tokens
+        if (performance.now() >= deadline) {
+            await yieldToEventLoop()
+            deadline = performance.now() + 8
+        }
+    }
+    return total
 }
 
 /**
