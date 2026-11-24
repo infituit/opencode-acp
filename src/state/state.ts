@@ -14,9 +14,15 @@ import {
     loadSessionState,
     resolveStorageDir,
     saveSessionState,
+    assertSessionNotRecovering,
+    retireRecoveryState,
 } from "./persistence"
 import { createModelLimitCatalog } from "./model-limits"
-import { rebuildCompressionState, restoreForkCompressionState } from "./rebuild"
+import {
+    rebuildCompressionState,
+    restoreForkCompressionState,
+    limitForkSourceHistory,
+} from "./rebuild"
 import {
     getSessionRelations,
     findLastCompactionTimestamp,
@@ -147,7 +153,16 @@ export class SessionStateRegistry {
     }
 
     get(sessionId: string): SessionState | undefined {
-        return this.states.get(sessionId)
+        const state = this.states.get(sessionId)
+        assertSessionNotRecovering(sessionId, state?.storageDir)
+        return state
+    }
+
+    /** Reload persisted state after an explicit maintenance operation. */
+    invalidate(sessionId: string): void {
+        const state = this.states.get(sessionId)
+        if (state) retireRecoveryState(state)
+        this.states.delete(sessionId)
     }
 
     all(): SessionState[] {
@@ -168,6 +183,13 @@ export class SessionStateRegistry {
         config?: PluginConfig,
     ): Promise<SessionState> {
         let state = this.states.get(sessionId)
+        assertSessionNotRecovering(
+            sessionId,
+            state?.storageDir ??
+                (config?.storagePath
+                    ? resolveStorageDir(config.storagePath, this.projectDir ?? cwd())
+                    : undefined),
+        )
         if (!state) {
             state = createSessionState()
             // Assign shared compressionTiming BEFORE ensureSessionInitialized so
@@ -374,19 +396,11 @@ export async function ensureSessionInitialized(
                         ? await fetchV2SessionMessages(client, parentSessionId)
                         : []
                     if (relations.fork) {
-                        const boundary = relations.fork.boundary
-                        const index = parentMessages.findIndex(
-                            (message) => message.info.id === boundary.messageID,
-                        )
                         // Never match against source messages beyond the fork point.
-                        // A missing boundary leaves history replay as the fallback.
-                        parentMessages =
-                            index < 0
-                                ? []
-                                : parentMessages.slice(
-                                      0,
-                                      index + (boundary.type === "through" ? 1 : 0),
-                                  )
+                        parentMessages = limitForkSourceHistory(
+                            parentMessages,
+                            relations.fork.boundary,
+                        )
                     }
                     if (parent && parentMessages.length > 0) {
                         // Standard subagents skip their first user prompt when

@@ -18,6 +18,8 @@ import type {
 } from "./types"
 import type { Logger } from "../logger"
 import { serializePruneMessagesState } from "./utils"
+import { randomUUID } from "node:crypto"
+import { isDeepStrictEqual } from "node:util"
 
 export interface NativeStateStorage {
     get(key: string): Promise<unknown>
@@ -209,11 +211,28 @@ export function saveSessionState(
     logger: Logger,
     sessionName?: string,
 ): Promise<void> {
+    if (retiredRecoveryStates.has(sessionState)) {
+        return Promise.reject(
+            new Error("Session state was replaced by fork recovery; reload it before saving."),
+        )
+    }
     if (!sessionState.sessionId) {
         return Promise.resolve()
     }
 
-    const state: PersistedSessionState = {
+    if (recoveringSessions.has(saveQueueKey(sessionState.sessionId, sessionState.storageDir))) {
+        return Promise.reject(new Error("Fork recovery is in progress; retry after it completes."))
+    }
+    const state = snapshotSessionState(sessionState, sessionName)
+
+    return enqueueSessionSave(sessionState.sessionId, state, logger, sessionState.storageDir)
+}
+
+export function snapshotSessionState(
+    sessionState: SessionState,
+    sessionName?: string,
+): PersistedSessionState {
+    return {
         sessionName: sessionName,
         prune: {
             messages: serializePruneMessagesState(sessionState.prune.messages),
@@ -244,8 +263,15 @@ export function saveSessionState(
         imageArchive: sessionState.imageArchive,
         stickyTruncations: sessionState.stickyTruncations,
     }
+}
 
-    const key = saveQueueKey(sessionState.sessionId, sessionState.storageDir)
+function enqueueSessionSave(
+    sessionId: string,
+    state: PersistedSessionState,
+    logger: Logger,
+    storageDir?: string,
+): Promise<void> {
+    const key = saveQueueKey(sessionId, storageDir)
     let queue = saveQueues.get(key)
     if (!queue) {
         queue = { pending: [], waiters: [], draining: false }
@@ -255,12 +281,7 @@ export function saveSessionState(
     const promise = new Promise<void>((resolve, reject) => {
         queue!.waiters.push({ resolve, reject })
     })
-    queue.pending.push({
-        sessionId: sessionState.sessionId,
-        state,
-        storageDir: sessionState.storageDir,
-        logger,
-    })
+    queue.pending.push({ sessionId, state, storageDir, logger })
 
     // Macrotask boundary: synchronous bursts pile onto one batch before I/O.
     if (!queue.draining) {
@@ -304,6 +325,140 @@ function drainSaveQueue(key: string): void {
                 if (q.waiters.length === 0) saveQueues.delete(key)
             }
         })
+}
+
+// Recovery is an explicit maintenance operation, never part of initialization.
+// The guard covers this plugin instance; shared cross-process writers are unsupported.
+const recoveringSessions = new Set<string>()
+const retiredRecoveryStates = new WeakSet<SessionState>()
+
+export function retireRecoveryState(state: SessionState): void {
+    retiredRecoveryStates.add(state)
+}
+
+export function assertSessionNotRecovering(sessionId: string, storageDir?: string): void {
+    if (recoveringSessions.has(saveQueueKey(sessionId, storageDir))) {
+        throw new Error("Fork recovery is in progress; retry after it completes.")
+    }
+}
+
+export async function withSessionRecovery<T>(
+    sessionId: string,
+    storageDir: string | undefined,
+    action: () => Promise<T>,
+): Promise<T> {
+    const key = saveQueueKey(sessionId, storageDir)
+    assertSessionNotRecovering(sessionId, storageDir)
+    if (saveQueues.has(key)) {
+        throw new Error("Session saves are pending. Wait for the session to be idle and retry.")
+    }
+    recoveringSessions.add(key)
+    try {
+        return await action()
+    } finally {
+        recoveringSessions.delete(key)
+    }
+}
+
+/** Read without normalization: recovery must distinguish missing from valid empty state. */
+export async function readRecoveryState(sessionId: string, storageDir?: string): Promise<string> {
+    if (storageDir === undefined && nativeStateStorage) {
+        const value = await nativeStateStorage.get(nativeStateKey(sessionId))
+        if (value === undefined || value === null) throw new Error("No persisted session state.")
+        return JSON.stringify(value)
+    }
+    return fs.readFile(getSessionFilePath(sessionId, storageDir), "utf8")
+}
+
+interface ForkRecoveryBackup {
+    sessionId: string
+    storageDir?: string
+    before: string
+    after: PersistedSessionState
+}
+
+function recoveryBackupPath(id: string, storageDir?: string): string {
+    if (!/^[0-9a-f-]{36}$/.test(id)) throw new Error("Invalid recovery backup ID.")
+    return join(getStorageDir(storageDir), "fork-recovery-backups", `${id}.json`)
+}
+
+export async function backupForkRecovery(
+    sessionId: string,
+    storageDir: string | undefined,
+    before: string,
+    after: PersistedSessionState,
+): Promise<{ id: string; path: string }> {
+    const id = randomUUID()
+    const path = recoveryBackupPath(id, storageDir)
+    await fs.mkdir(join(getStorageDir(storageDir), "fork-recovery-backups"), {
+        recursive: true,
+        mode: 0o700,
+    })
+    const backup: ForkRecoveryBackup = { sessionId, storageDir, before, after }
+    await fs.writeFile(path, JSON.stringify(backup, null, 2), { flag: "wx", mode: 0o600 })
+    return { id, path }
+}
+
+/** Compare persisted content while allowing ordinary saves to refresh the timestamp. */
+export function sameRecoveryState(left: string, right: string): boolean {
+    const a = JSON.parse(left)
+    const b = JSON.parse(right)
+    delete a.lastUpdated
+    delete b.lastUpdated
+    return isDeepStrictEqual(a, b)
+}
+
+// Recovery uses an atomic file replacement, or the host's single-key set.
+// Ordinary saves retain their existing queue and behavior.
+export async function writeRecoveryState(
+    sessionId: string,
+    storageDir: string | undefined,
+    content: string,
+): Promise<void> {
+    if (!recoveringSessions.has(saveQueueKey(sessionId, storageDir))) {
+        throw new Error("Recovery write requires the session maintenance guard.")
+    }
+    if (storageDir === undefined && nativeStateStorage) {
+        await nativeStateStorage.set(nativeStateKey(sessionId), JSON.parse(content))
+        return
+    }
+    const path = getSessionFilePath(sessionId, storageDir)
+    const temporary = `${path}.${randomUUID()}.tmp`
+    try {
+        await fs.writeFile(temporary, content, { flag: "wx", mode: 0o600 })
+        await fs.rename(temporary, path)
+    } finally {
+        await fs.rm(temporary, { force: true })
+    }
+}
+
+export async function rollbackForkRecovery(
+    sessionId: string,
+    storageDir: string | undefined,
+    id: string,
+    unchanged: () => boolean = () => true,
+    invalidate: () => void = () => {},
+): Promise<void> {
+    const backup: ForkRecoveryBackup = JSON.parse(
+        await fs.readFile(recoveryBackupPath(id, storageDir), "utf8"),
+    )
+    if (backup.sessionId !== sessionId || backup.storageDir !== storageDir) {
+        throw new Error("Backup belongs to a different session or storage location.")
+    }
+    const current = await readRecoveryState(sessionId, storageDir)
+    if (!sameRecoveryState(current, JSON.stringify(backup.after))) {
+        throw new Error(
+            "Session has changed since recovery; rollback refused to preserve newer work.",
+        )
+    }
+    JSON.parse(backup.before)
+    if (!unchanged()) throw new Error("Session changed during rollback; retry while idle.")
+    try {
+        await writeRecoveryState(sessionId, storageDir, backup.before)
+    } finally {
+        // A host set may throw after committing; never reuse the old live snapshot.
+        invalidate()
+    }
 }
 
 export async function loadSessionState(
