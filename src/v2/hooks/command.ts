@@ -3,6 +3,7 @@ import type { PluginConfig } from "../../config"
 import type { SessionStateRegistry } from "../../state"
 import { handleContextCommand, handleStatsCommand } from "../../commands"
 import { handleExportCommand } from "../../commands/export"
+import { handleRecoverForkCommand } from "../../commands/recover-fork"
 import { sendIgnoredMessage } from "../../ui/notification"
 import type { HostPermissionSnapshot } from "../../host-permissions"
 import { syncCompressPermissionState } from "../../compress-permission"
@@ -17,6 +18,8 @@ function buildHelpText(): string {
         "  /acp stats        Compression status: blocks, context usage, ranges",
         "  /acp export       Export active compression blocks to markdown",
         "                   Options: --output <path>, --tier t1,t2,t3, --stdout, --append",
+        "  /acp recover-fork Preview recovery for an existing empty fork",
+        "                   --apply backs up and restores; --rollback <backup-id> undoes it",
         "  /acp help         Show this help",
     ].join("\n")
 }
@@ -38,6 +41,22 @@ export function createCommandExecuteHandler(
         }
 
         if (input.command === "acp") {
+            const recovery = input.arguments?.trim()
+            if (/^recover-fork(?:\s|$)/i.test(recovery ?? "")) {
+                // Preview must not initialize or save the session as a side effect.
+                await handleRecoverForkCommand(
+                    {
+                        client,
+                        registry,
+                        logger,
+                        config,
+                        workingDirectory,
+                        sessionId: input.sessionID,
+                    },
+                    recovery!.slice("recover-fork".length).trim(),
+                )
+                throw new Error("__ACP_CONTEXT_HANDLED__")
+            }
             const messages = await fetchSessionMessages(client, input.sessionID)
 
             const state = await registry.getOrCreate(client, input.sessionID, messages, config)

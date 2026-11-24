@@ -200,6 +200,15 @@ function translateIds(ids: string[], mapped: Map<string, string>): string[] | nu
     return translated.some((id) => !id) ? null : (translated as string[])
 }
 
+/** Restrict source matching to the history actually copied by the fork. */
+export function limitForkSourceHistory(
+    messages: WithParts[],
+    boundary: { type: "before" | "through"; messageID: string },
+): WithParts[] {
+    const index = messages.findIndex((message) => message.info.id === boundary.messageID)
+    return index < 0 ? [] : messages.slice(0, index + (boundary.type === "through" ? 1 : 0))
+}
+
 /**
  * Restore pre-fork compression blocks from the parent state when the fork's
  * copied history no longer includes replayable compress inputs. This is
