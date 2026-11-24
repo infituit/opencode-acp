@@ -18,7 +18,7 @@ import {
 import { createModelLimitCatalog } from "./model-limits"
 import { rebuildCompressionState, restoreForkCompressionState } from "./rebuild"
 import {
-    getSessionParentId,
+    getSessionRelations,
     findLastCompactionTimestamp,
     countTurns,
     resetOnCompaction,
@@ -326,8 +326,10 @@ export async function ensureSessionInitialized(
         ? resolveStorageDir(config.storagePath, projectDir ?? cwd())
         : undefined
 
-    const parentSessionId = await getSessionParentId(client, sessionId)
-    const isChildSession = parentSessionId !== undefined
+    const relations = await getSessionRelations(client, sessionId)
+    // Fork provenance is independent of the subagent relationship.
+    const parentSessionId = relations.fork?.sessionID ?? relations.parentID
+    const isChildSession = relations.parentID !== undefined
     state.isSubAgent = isChildSession
 
     state.lastCompaction = findLastCompactionTimestamp(messages)
@@ -358,21 +360,34 @@ export async function ensureSessionInitialized(
             let restored = 0
             if (parentSessionId) {
                 try {
-                    const parent = await loadSessionState(parentSessionId, logger)
-                    // [#485 review] Forks/subagents inherit the parent's frozen
-                    // truncations so the wire view stays stable across the fork
-                    // point (this branch returns before the regular sticky
-                    // restore below, which only runs for persisted sessions).
-                    if (parent?.stickyTruncations) {
+                    const parent = await loadSessionState(parentSessionId, logger, state.storageDir)
+                    // Preserve parent-only inheritance. Explicit forks translate
+                    // call IDs only after the boundary and block mapping succeed.
+                    if (!relations.fork && parent?.stickyTruncations) {
                         for (const [callID, output] of Object.entries(parent.stickyTruncations)) {
                             if (typeof output === "string") {
                                 state.stickyTruncations[callID] = output
                             }
                         }
                     }
-                    const parentMessages = parent
+                    let parentMessages = parent
                         ? await fetchV2SessionMessages(client, parentSessionId)
                         : []
+                    if (relations.fork) {
+                        const boundary = relations.fork.boundary
+                        const index = parentMessages.findIndex(
+                            (message) => message.info.id === boundary.messageID,
+                        )
+                        // Never match against source messages beyond the fork point.
+                        // A missing boundary leaves history replay as the fallback.
+                        parentMessages =
+                            index < 0
+                                ? []
+                                : parentMessages.slice(
+                                      0,
+                                      index + (boundary.type === "through" ? 1 : 0),
+                                  )
+                    }
                     if (parent && parentMessages.length > 0) {
                         // Standard subagents skip their first user prompt when
                         // assigning refs. A copied fork needs that prompt to

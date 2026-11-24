@@ -324,6 +324,14 @@ export function restoreForkCompressionState(
     messagesState.membershipsVerified = true
     state.prune.messages = messagesState
     state.messageIds = forkState.messageIds
+    // Only inherit frozen outputs whose source calls were verified in the
+    // supplied (fork-boundary-limited) history, using the fork's call IDs.
+    for (const [callID, output] of Object.entries(parent.stickyTruncations ?? {})) {
+        const forkCallID = mapped.tools.get(callID)
+        if (forkCallID && typeof output === "string") {
+            state.stickyTruncations[forkCallID] = output
+        }
+    }
 
     logger.info("fork: restored compression state from parent", {
         blocks: copiedBlockIds.size,
