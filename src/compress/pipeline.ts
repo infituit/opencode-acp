@@ -3,8 +3,7 @@ import { ensureSessionInitialized } from "../state"
 import { saveSessionState } from "../state/persistence"
 import { assignMessageRefs } from "../message-ids"
 import { isHostInput, isIgnoredUserMessage, isSyntheticMessage } from "../messages/query"
-import { getCurrentParams, getCurrentTokenUsage } from "../context-usage"
-import { sendCompressNotification } from "../ui/notification"
+import { getCurrentTokenUsage } from "../context-usage"
 import type { ToolContext } from "./types"
 import { buildSearchContext, fetchSessionMessages } from "./search"
 import type { SearchContext } from "./types"
@@ -111,25 +110,23 @@ export async function finalizeSession(
         }
     }
 
-    const params = getCurrentParams(ctx.state, rawMessages, ctx.logger)
-    const sessionMessageIds = rawMessages
-        .filter((msg) => !isIgnoredUserMessage(msg))
-        .map((msg) => msg.info.id)
-
-    const contextTokensBefore = getCurrentTokenUsage(ctx.state, rawMessages)
-
-    await sendCompressNotification(
-        ctx.client,
-        ctx.logger,
-        ctx.config,
-        ctx.state,
-        toolCtx.sessionID,
-        entries,
-        batchTopic,
-        sessionMessageIds,
-        params,
-        contextTokensBefore,
-    )
+    // Completion is a background event, not durable session input. Keep the
+    // operational metrics even when legacy display notifications are disabled.
+    if (entries.length > 0) {
+        await ctx.logger.info("Compression completed", {
+            sessionId: toolCtx.sessionID,
+            blockIds: entries.map((entry) => entry.blockId),
+            topics: entries.map(
+                (entry) => ctx.state.prune.messages.blocksById.get(entry.blockId)?.topic ?? "?",
+            ),
+            compressedTokens: entries.reduce((sum, entry) => {
+                const block = ctx.state.prune.messages.blocksById.get(entry.blockId)
+                return sum + (block?.effectiveCompressedTokens ?? block?.compressedTokens ?? 0)
+            }, 0),
+            summaryTokens: entries.reduce((sum, entry) => sum + entry.summaryTokens, 0),
+            contextTokensBefore: getCurrentTokenUsage(ctx.state, rawMessages),
+        })
+    }
 }
 
 /**

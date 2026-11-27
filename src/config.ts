@@ -349,11 +349,7 @@ function showConfigWarnings(
         }
     }
 
-    setTimeout(() => {
-        try {
-            void ctx.notify?.(`ACP: ${configType} warning`, `${configPath}\n${messages.join("\n")}`)
-        } catch {}
-    }, 7000)
+    reportConfigWarning(ctx, `ACP: ${configType} warning`, `${configPath}\n${messages.join("\n")}`)
 }
 
 const defaultConfig: PluginConfig = {
@@ -363,9 +359,8 @@ const defaultConfig: PluginConfig = {
     logLevel: "info",
     allowSubAgents: true,
     pruneNotification: "off",
-    // [FIX #20] Default to toast — chat-mode notifications inject an empty
-    // user message that freezes the session on providers that reject empty
-    // messages (zhipuai-lb code 1214). See src/ui/notification.ts.
+    // Legacy display preferences remain readable. Server-only background
+    // notices are logged; neither chat nor toast delivery is used.
     pruneNotificationType: "toast",
     commands: {
         enabled: true,
@@ -814,12 +809,12 @@ function mergeLayer(config: PluginConfig, data: Record<string, any>): PluginConf
     }
 }
 
-function scheduleParseWarning(ctx: ConfigHostContext, title: string, message: string): void {
-    setTimeout(() => {
-        try {
-            void ctx.notify?.(title, message)
-        } catch {}
-    }, 7000)
+function reportConfigWarning(ctx: ConfigHostContext, title: string, message: string): void {
+    try {
+        // Warnings are collected during loading and logged by the host once its
+        // configured logger is available. Reporting must not prevent startup.
+        void ctx.notify?.(title, message).catch(() => {})
+    } catch {}
 }
 
 export function getConfig(ctx: ConfigHostContext): PluginConfig {
@@ -843,7 +838,7 @@ export function getConfig(ctx: ConfigHostContext): PluginConfig {
 
         const result = loadConfigFile(layer.path)
         if (result.parseError) {
-            scheduleParseWarning(
+            reportConfigWarning(
                 ctx,
                 `ACP: Invalid ${layer.name}`,
                 `${layer.path}\n${result.parseError}\nUsing previous/default values`,

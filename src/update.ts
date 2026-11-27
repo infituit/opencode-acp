@@ -30,7 +30,7 @@ export function startAutoUpdate(host: AutoUpdateHost, enabled: boolean, logger?:
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 10_000)
     void checkAutoUpdate(controller.signal, logger)
-        .then((result) => {
+        .then(async (result) => {
             if (!result.updated) {
                 if ("error" in result) {
                     logger?.warn("Auto-update failed", {
@@ -47,12 +47,10 @@ export function startAutoUpdate(host: AutoUpdateHost, enabled: boolean, logger?:
                 from: result.current,
                 to: result.latest,
             })
-            setTimeout(() => {
-                void host.notify(
-                    "ACP update ready",
-                    `Updated ${result.name} from ${result.current} to ${result.latest}. Restart OpenCode to finish.`,
-                )
-            }, 5000)
+            await host.notify(
+                "ACP update ready",
+                `Updated ${result.name} from ${result.current} to ${result.latest}. Restart OpenCode to finish.`,
+            )
         })
         .catch(() => {})
         .finally(() => clearTimeout(timeout))

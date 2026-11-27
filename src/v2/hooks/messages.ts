@@ -323,10 +323,8 @@ export function createChatMessageTransformHandler(
                 compressionPriorities,
                 config.debug
                     ? (text: string) => {
-                          // sendIgnoredMessage writes an ignored:true user msg to DB.
-                          // opencode's runtime loop detects it as "last user" (role-only,
-                          // ignores the flag) → phantom turn → compress → notification →
-                          // infinite loop. Use logger.debug + toast instead.
+                          // Diagnostics stay in the log; model reminders are
+                          // already part of the outgoing context, not session input.
                           logger.debug(`[ACP Debug] Nudge injected:\n${text}`)
                       }
                     : undefined,
