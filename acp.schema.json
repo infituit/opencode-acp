@@ -39,13 +39,13 @@
             "type": "string",
             "enum": ["off", "minimal", "detailed"],
             "default": "off",
-            "description": "Level of notification shown when context management occurs"
+            "description": "Legacy display preference, retained for configuration compatibility. Server-only compression completion events are logged according to logLevel; this setting does not affect model context reminders."
         },
         "pruneNotificationType": {
             "type": "string",
             "enum": ["chat", "toast"],
             "default": "toast",
-            "description": "Where to display notifications (chat deprecated, falls back to toast)"
+            "description": "Legacy display destination, retained for configuration compatibility. Neither chat nor toast is used for server-only background notices; notices are logged without adding session input."
         },
         "commands": {
             "type": "object",
@@ -118,7 +118,7 @@
                 "showCompression": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Show compression summaries in notifications"
+                    "description": "Legacy notification summary preference, retained for configuration compatibility. Server-only background notices do not display summaries."
                 },
                 "summaryBuffer": {
                     "type": "boolean",
@@ -308,7 +308,7 @@
                             },
                             "showCompression": {
                                 "type": "boolean",
-                                "description": "Override for showing compression summaries in notifications."
+                                "description": "Legacy notification summary override, retained for configuration compatibility. Server-only background notices do not display summaries."
                             },
                             "summaryBuffer": {
                                 "type": "boolean",
@@ -457,7 +457,7 @@
                                         },
                                         "showCompression": {
                                             "type": "boolean",
-                                            "description": "Override for showing compression summaries in notifications."
+                                            "description": "Legacy notification summary override, retained for configuration compatibility. Server-only background notices do not display summaries."
                                         },
                                         "summaryBuffer": {
                                             "type": "boolean",

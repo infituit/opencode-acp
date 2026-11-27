@@ -44,30 +44,6 @@ async function findV2ToolName(
     return undefined
 }
 
-async function notifySession(ctx: Context, title: string, message: string): Promise<void> {
-    try {
-        const response = await ctx.session.list()
-        const sessions = Array.isArray(response)
-            ? response
-            : ((response as { data?: unknown }).data ?? [])
-        const sessionID =
-            Array.isArray(sessions) &&
-            typeof (sessions[0] as { id?: unknown } | undefined)?.id === "string"
-                ? (sessions[0] as { id: string }).id
-                : undefined
-        if (sessionID) {
-            await ctx.session.synthetic({
-                sessionID,
-                text: message,
-                description: title,
-                metadata: { source: "opencode-acp" },
-            })
-        }
-    } catch {
-        // Configuration warnings must never prevent plugin startup.
-    }
-}
-
 async function registerTools(
     ctx: Context,
     config: ReturnType<typeof getConfig>,
@@ -106,13 +82,18 @@ export const AcpV2Plugin = Plugin.define({
     id: "opencode-acp",
 
     async setup(ctx) {
+        const configWarnings: Array<{ title: string; message: string }> = []
         const config = getConfig({
             directory: ctx.location.directory,
-            notify: (title, message) => notifySession(ctx, title, message),
+            notify: async (title, message) => {
+                configWarnings.push({ title, message })
+            },
         })
-        if (!config.enabled) return
-
         const logger = new Logger(config.debug, config.debug ? "debug" : config.logLevel)
+        for (const { title, message } of configWarnings) {
+            await logger.warn(title, { message })
+        }
+        if (!config.enabled) return
         configureNativeStateStorage({
             get: (key) => ctx.storage.get(key),
             set: (key, value) => ctx.storage.set(key, value as never),
@@ -127,7 +108,9 @@ export const AcpV2Plugin = Plugin.define({
         )
         startAutoUpdate(
             {
-                notify: (title, message) => notifySession(ctx, title, message),
+                notify: async (title, message) => {
+                    await logger.info(title, { message })
+                },
             },
             config.autoUpdate,
             logger,
